@@ -49,6 +49,6 @@ Note: A bit unsure if I should use ChromaDB or Postgres with pgvector.
     │   └── Returns personalized roadmap
     │
     └── Streamlit/React frontend displays results nicely
+```
 
-
-    Installation guide will be given later on when I've started coding. 
+Installation guide will be given later on when I've started coding. 
