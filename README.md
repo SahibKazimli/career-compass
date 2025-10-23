@@ -33,21 +33,22 @@ Note: A bit unsure if I should use ChromaDB or Postgres with pgvector.
 
 ## Program Flow Idea
 
-Career Compass
-│
-├── User uploads resume or fills form
-│
-├── FastAPI backend parses & embeds text
-│   ├── Extracts skills, experience, education
-│   ├── Generates embeddings (OpenAI/Gemini)
-│   ├── Stores profile in SQLite + ChromaDB
-│
-├── User queries “best career paths” or “skills to learn for ML engineer”
-│   ├── FastAPI retrieves embeddings
-│   ├── Runs LLM-based reasoning
-│   └── Returns personalized roadmap
-│
-└── Streamlit/React frontend displays results nicely
+```bash
+    Career Compass
+    │
+    ├── User uploads resume or fills form
+    │
+    ├── FastAPI backend parses & embeds text
+    │   ├── Extracts skills, experience, education
+    │   ├── Generates embeddings (OpenAI/Gemini)
+    │   ├── Stores profile in SQLite + ChromaDB
+    │
+    ├── User queries “best career paths” or “skills to learn for ML engineer”
+    │   ├── FastAPI retrieves embeddings
+    │   ├── Runs LLM-based reasoning
+    │   └── Returns personalized roadmap
+    │
+    └── Streamlit/React frontend displays results nicely
 
 
-Installation guide will be given later on when I've started coding. 
+    Installation guide will be given later on when I've started coding. 
