@@ -10,3 +10,5 @@ venv/
 # Databases
 *.db 
 *.sqlite3
+
+# More to come

@@ -29,4 +29,4 @@ This project combines natural language processing, semantic search, and LLM reas
 | **Server** | uvicorn |
 | **Frontend** | Streamlit (will create proper frontend later on) 
 
-Note: A bit unsure if I want to use ChromaDB or Postgres with pgvector. 
+Note: A bit unsure if I should use ChromaDB or Postgres with pgvector. 
