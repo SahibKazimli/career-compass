@@ -30,6 +30,7 @@ This project combines natural language processing, semantic search, and LLM reas
 | **Frontend** | Streamlit (will probably create proper frontend later on) 
 
 Note: A bit unsure if I should use ChromaDB or Postgres with pgvector. 
+Note: Will be implementing MVP without vectorDB. 
 
 ## Program Flow Idea
 
