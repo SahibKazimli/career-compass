@@ -35,4 +35,23 @@ class Resume(Base):
     created_at = Column(DateTime, default=datetime)
 
 
+class CareerPath(Base):
+    __tablename = "career_paths"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    career_path_id = Column(Integer)
+    similarity_score = Column(float)
+    skill_gaps = Column(Text) # JSON string
+    learning_path = Column(Text)  # JSON string
+    created_at = Column(DateTime, default=datetime)
+    
 
+# Create all tables 
+
+def get_db():
+    db = SessionLocal()
+    try: 
+        yield db
+    finally: 
+        db.close()
