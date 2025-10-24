@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-# For MVP - storing everything in one database
+# For MVP - storing everything in one database 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./career_compass.db"
 
 # check_same_thread = False, required for FastAPI
@@ -36,19 +36,36 @@ class Resume(Base):
 
 
 class CareerPath(Base):
-    __tablename = "career_paths"
+    __tablename__ = "career_paths"
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
-    career_path_id = Column(Integer)
-    similarity_score = Column(float)
-    skill_gaps = Column(Text) # JSON string
-    learning_path = Column(Text)  # JSON string
+    description = Column(Text)
+    required_skills = Column(Text)  # JSON string
+    embedding = Column(Text)  # JSON array as string
+    avg_salary = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime)
     
+    
+class Recommendations(Base):
+    __tablename__ = "recommendations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer)
+    career_path_id = Column(Integer)
+    similarity_score = Column(Float)
+    skill_gaps = Column(Text)  # JSON string
+    learning_path = Column(Text)  # JSON string
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+        
 
 # Create all tables 
-
+def init_db():
+    Base.metadata.create_all(bind=engine)
+    
+    
 def get_db():
     db = SessionLocal()
     try: 
