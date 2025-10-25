@@ -64,7 +64,7 @@ async def upload_resume(
         user_id=user_id, 
         raw_text=f"Uploaded file: {file.filename}",
         parsed_skills=[],
-        parsed_experience=[]
+        parsed_experience=[],
         embedding=[]
     )
     db.add(resume)
