@@ -71,3 +71,9 @@ async def upload_resume(
     db.commit()
     db.refresh(resume)
     
+    return {
+        "message": "Resume uploaded successfully",
+        "resume_id": resume.id,
+        "filename": file.filename
+    }
+    
