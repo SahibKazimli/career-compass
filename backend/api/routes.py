@@ -2,6 +2,10 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db.database import init_db, get_db, User, Resume
 from contextlib import asynccontextmanager
+import tempfile
+from parsing.resume_parser import genai_parse_pdf
+from utils.embeddings import embed_resume_chunks
+from parsing.parsing_helpers import parse_upload
 
 app = FastAPI(title="Career Compass")
 
@@ -62,14 +66,21 @@ async def upload_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    content = await file.read()
     
-    # Just storing PDF file name for now, parsing will be implemented later
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDFs are supported")
+    
+    user_check = db.execute("SELECT id FROM users WHERE id = :user_id", {"user_id":user_id})
+    if not user_check:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+    parsed = parse_upload(file)
     resume = Resume(
         user_id=user_id, 
-        raw_text=f"Uploaded file: {file.filename}",
-        parsed_skills=[],
-        parsed_experience=[],
+        raw_text=parsed["raw_text"],
+        parsed_skills=parsed["skills"],
+        parsed_experience=["experience"],            
         embedding=[]
     )
     db.add(resume)
