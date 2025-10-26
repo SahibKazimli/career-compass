@@ -9,9 +9,7 @@ from resume_parser import genai_parse_pdf
 from utils.embeddings import embed_resume_chunks
 
 
-def parse_upload(
-    file: UploadFile = File(...)
-):
+def parse_upload(file: UploadFile = File(...)):
      # Save to temporary file for processing
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
         tmp_file.write(content)
@@ -39,7 +37,6 @@ def parse_upload(
             
             # Extract skills from skills section
             if 'skill' in section:
-                # Simple extraction - you can make this more sophisticated
                 skills.append(content)
             
             # Extract experience from work/experience sections
