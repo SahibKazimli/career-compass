@@ -58,8 +58,6 @@ def get_user(user_id: id, db: Session = Depends(get_db)):
         "created_at": str(user[3]) if user[3] else None
     }    
     
-
-
 @app.post("/resume/upload")
 async def upload_resume(
     user_id: id, 
@@ -88,8 +86,21 @@ async def upload_resume(
     db.refresh(resume)
     
     return {
-        "message": "Resume uploaded successfully",
-        "resume_id": resume.id,
-        "filename": file.filename
-    }
-    
+            "message": "Resume uploaded and processed successfully",
+            "resume_id": resume.id,
+            "filename": file.filename,
+            "parsed_data": {
+                "chunks": [
+                    {
+                        "section": chunk['section'],
+                        "content": chunk['content'],
+                        "summary": chunk['summary']
+                        
+                    }
+                    for chunk in resume['chunks']
+                ],
+                "skills": parsed["skills"],
+                "experience": parsed["experience"],
+                "total_chunks": parsed["chunks"]
+            },
+        }
