@@ -11,4 +11,4 @@ venv/
 *.db 
 *.sqlite3
 
-# More to come
+credentials
