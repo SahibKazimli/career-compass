@@ -3,7 +3,6 @@ import numpy as np
 from dotenv import load_dotenv
 import pathlib
 from typing import List, Dict
-import os
 
 """For now, I'll implement chunking and embedding for the resume uploads, as
 well as the user inputs to the LLM. The webscraping will be implemented later, after
@@ -73,6 +72,19 @@ def embed_resume_chunks(
         
     except Exception as e:
         print(f"Embedding failed: {e}")
-       
+
+
+def compute_similarity(embedding1: List[float], embedding2: List[float]) -> float:
+    
+    vec1 = np.array(embedding1)
+    vec2 = np.array(embedding2)
+    
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    
+    cosine = dot_product/ (norm1*norm2)
+    return cosine
+    
     
     

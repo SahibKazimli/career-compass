@@ -25,8 +25,8 @@ def init_client():
     
     genai.configure(api_key=api_key)
 
-    
 
+    
 def genai_parse_pdf(
     pdf_path: str,
     filename: str, 
@@ -105,6 +105,3 @@ def genai_parse_pdf(
             "chunks": chunks,
             "total_chunks": len(chunks)
         }
-        
-
-        
