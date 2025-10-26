@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 import os 
 import time
 import pathlib
+import re
+import json
 
 """For now, chunking and embedding will only be implemented for the resume upload, 
 for the MVP."""
@@ -25,9 +27,9 @@ def init_client():
 
     
 
-
 def genai_parse_pdf(
     pdf_path: str,
+    filename: str, 
     model: str = "gemini-2.5-flash"
 ):
     # Parse a PDF using Gemini's File API. 
@@ -48,27 +50,26 @@ def genai_parse_pdf(
     
     # Create a structured prompt to extract resume information
     prompt = """
-    You are a resume parser. Extract and structure the following information from this resume:
-    
-    1. Personal Information: Name, contact details
-    2. Summary/Objective: Professional summary if present
-    3. Work Experience: List all jobs with:
-       - Company name
-       - Job title
-       - Duration
-       - Key responsibilities and achievements
-    4. Education: List all education with:
-       - Institution name
-       - Degree/qualification
-       - Field of study
-       - Graduation year
-    5. Skills: List all technical and soft skills mentioned
-    6. Projects: Any notable projects mentioned
-    7. Certifications: Any certifications or licenses
-    
-    Return the information in a clear, structured JSON format.
-    If a section is not present in the resume, return an empty list or null for that field.
-    """
+        Analyze this resume and break it down into logical sections.
+        For each section you find, provide:
+        1. section: The section name (e.g., "Work Experience", "Education", "Skills", "Summary", "Projects", "Certifications")
+        2. content: The complete text content of that section (keep all details)
+        3. summary: A brief 1-2 sentence summary of that section
+        
+        Return as a JSON array:
+        [
+          {
+            "section": "Work Experience",
+            "content": "Complete work experience text...",
+            "summary": "Brief summary..."
+          }
+        ]
+        
+        Important:
+        - Capture ALL sections in the resume
+        - Keep full original text in "content" field
+        - Create logical sections even if not clearly labeled in resume
+        """
     
     model_instance = genai.GenerativeModel(model)
     model_response = model_instance.generate_content([uploaded_file, prompt])
@@ -77,10 +78,33 @@ def genai_parse_pdf(
     genai.delete_file(uploaded_file.name)
     print(f"File deleted from Gemini servers")
     
+    # Parse the JSON response
+    text = model_response.text
+    
+    json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
+    if json_match:
+        text = json_match.group(1)
+    
+    try:
+        chunks = json.loads(text)
+        if not isinstance(chunks, list):
+            raise ValueError("Expected JSON array")
+    except (json.JSONDecodeError, ValueError):
+            # Fallback if parsing fails
+            print("Warning: Could not parse structured response, using fallback")
+            chunks = [{
+                "section": "Full Resume",
+                "content": text,
+                "summary": "Resume content"
+            }]
+            
+    print(f"Successfully parsed {len(chunks)} sections")
+        
     return {
-        "raw_text": model_response.text,
-        "file_name": uploaded_file.display_name,
-    }
-    
-    
+            "filename": filename,
+            "chunks": chunks,
+            "total_chunks": len(chunks)
+        }
+        
+
         
