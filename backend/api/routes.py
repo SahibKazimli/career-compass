@@ -24,11 +24,16 @@ def read_root():
 @app.post("/users")
 def create_user(email:str, name:str, db: Session=Depends(get_db)):
     # Create a new user
-    user = User(email=email, name=name)
-    db.add(user)
+    query = "INSERT INTO users (email, name, created_at) VALUES (:email, :name, datetime('now'))"
+    db.execute(query, {"email": email, "name": name})
     db.commit()
-    db.refresh(user)
-    return {"id": user.id, "email": user.email, "name": user.name}
+    
+    result = db.execute("SELECT last_insert_rowid()")
+    user_id = next(result)[0]
+    
+    return {"id": user_id, "email": email, "name": name}
+    
+    
 
 
 @app.get("/users/{user_id}")
