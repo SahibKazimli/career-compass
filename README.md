@@ -23,14 +23,15 @@ This project combines natural language processing, semantic search, and LLM reas
 | **Web Framework** | FastAPI |
 | **Database (ORM)** | SQLite |
 | **vectorDB** | ChromaDB | 
-| **LLM** | Gemini/OpenAI |
+| **LLM** | Gemini |
 | **OCR/NLP** | Tesseract |
 | **Security** | python-dotenv |
 | **Server** | uvicorn |
 | **Frontend** | Streamlit (will probably create proper frontend later on) 
 
-Note: A bit unsure if I should use ChromaDB or Postgres with pgvector. 
+Note: A bit unsure if I should use ChromaDB or Postgres with pgvector. MVP with SQLite.
 Note: Will be implementing MVP without vectorDB. 
+Further note: Might be able to skip OCR since Resumes are quite easy to parse? 
 
 ## Program Flow Idea
 
