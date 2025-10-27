@@ -1,10 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
-from sqlalchemy.orm import Session
-from db.database import init_db, get_db, User, Resume
-from contextlib import asynccontextmanager
+from fastapi import UploadFile, File
 import tempfile
 import os
-import json
 from resume_parser import genai_parse_pdf
 from utils.embeddings import embed_resume_chunks
 
@@ -20,15 +16,14 @@ def parse_upload(file: UploadFile = File(...)):
         print(f"Parsing resume: {file.filename}")
         parsed_resume = genai_parse_pdf(tmp_path, file.filename)
         
-        # Embed the parsed chunks
         print(f"Embedding chunks...")
         embedded_resume = embed_resume_chunks(parsed_resume)
         
-        # Extract skills and experience from chunks
         skills = []
         experience = []
         raw_text_parts = []
         
+        # Extract skills and experience from chunks
         for chunk in embedded_resume['chunks']:
             section = chunk['section'].lower()
             content = chunk['content']

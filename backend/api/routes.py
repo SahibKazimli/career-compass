@@ -2,21 +2,19 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db.database import init_db, get_db, User, Resume
 from contextlib import asynccontextmanager
-import tempfile
-from parsing.resume_parser import genai_parse_pdf
-from utils.embeddings import embed_resume_chunks
 from parsing.parsing_helpers import parse_upload
 
 app = FastAPI(title="Career Compass")
 
-# Initialize db on startup 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize database
+    """
+    Manage the application lifespan by initializing the database on startup and handling any necessary cleanup on shutdown.
+    Prints status messages indicating the initialization and shutdown phases.
+    """
     init_db()
     print("Database initialized! career_compass.db file created.")
     yield
-    # Shutdown: Clean up resources (if needed)
     print("Shutting down...")
 
 
@@ -27,6 +25,7 @@ def read_root():
 
 @app.post("/users")
 def create_user(email:str, name:str, db: Session=Depends(get_db)):
+
     # Create a new user
     query = "INSERT INTO users (email, name, created_at) VALUES (:email, :name, datetime('now'))"
     db.execute(query, {"email": email, "name": name})
@@ -42,6 +41,10 @@ def create_user(email:str, name:str, db: Session=Depends(get_db)):
 
 @app.get("/users/{user_id}")
 def get_user(user_id: id, db: Session = Depends(get_db)):
+    """
+    Retrieve user information by user ID.
+    Queries the database for the user and returns their ID, email, name, and creation timestamp.
+    """
     
     query = "SELECT * FROM users WHERE id = :user_id"
     result = db.execute(query, {"id": user_id})
@@ -58,13 +61,18 @@ def get_user(user_id: id, db: Session = Depends(get_db)):
         "created_at": str(user[3]) if user[3] else None
     }    
     
+    
 @app.post("/resume/upload")
 async def upload_resume(
     user_id: id, 
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    
+    """
+    Upload and process a user's resume file.
+    Validates that the file is a PDF, checks if the user exists, parses the resume content,
+    stores the parsed data in the database, and returns a summary including parsed chunks, skills, and experience.
+    """
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
     
@@ -84,6 +92,7 @@ async def upload_resume(
     db.add(resume)
     db.commit()
     db.refresh(resume)
+    
     
     return {
             "message": "Resume uploaded and processed successfully",
