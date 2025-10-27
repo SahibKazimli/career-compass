@@ -40,12 +40,12 @@ def parse_upload(file: UploadFile = File(...)):
             
             raw_text = "\n".join(raw_text_parts)
         
-            return {
-                "filename": file.filename,
-                "raw_text": raw_text,
-                "skills": skills,
-                "experience": experience,
-                "chunks": embedded_resume["chunks"]
-            }
+        return {
+            "filename": file.filename,
+            "raw_text": raw_text,
+            "skills": skills,
+            "experience": experience,
+            "chunks": embedded_resume["chunks"]
+        }
             
-        os.remove(tmp_path)
+    os.remove(tmp_path)

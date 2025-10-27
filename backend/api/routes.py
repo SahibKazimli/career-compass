@@ -1,8 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
-from db.database import init_db, get_db, User, Resume
+from db.database import init_db, get_db, Resume
 from contextlib import asynccontextmanager
 from parsing.parsing_helpers import parse_upload
+import json
+import os
 
 app = FastAPI(title="Career Compass")
 
@@ -40,7 +42,7 @@ def create_user(email:str, name:str, db: Session=Depends(get_db)):
 
 
 @app.get("/users/{user_id}")
-def get_user(user_id: id, db: Session = Depends(get_db)):
+def get_user(user_id: int, db: Session = Depends(get_db)):
     """
     Retrieve user information by user ID.
     Queries the database for the user and returns their ID, email, name, and creation timestamp.
@@ -64,7 +66,7 @@ def get_user(user_id: id, db: Session = Depends(get_db)):
     
 @app.post("/resume/upload")
 async def upload_resume(
-    user_id: id, 
+    user_id: int, 
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -84,10 +86,10 @@ async def upload_resume(
     parsed = parse_upload(file)
     resume = Resume(
         user_id=user_id, 
-        raw_text=parsed["raw_text"],
-        parsed_skills=parsed["skills"],
-        parsed_experience=["experience"],            
-        embedding=[]
+        raw_text=json.dumps(parsed["raw_text"]),
+        parsed_skills=json.dumps(parsed["skills"]),
+        parsed_experience=json.dumps(parsed["experience"]),            
+        embedding=json.dumps([chunk['embedding'] for chunk in parsed['chunks']])
     )
     db.add(resume)
     db.commit()
@@ -106,10 +108,10 @@ async def upload_resume(
                         "summary": chunk['summary']
                         
                     }
-                    for chunk in resume['chunks']
+                    for chunk in parsed['chunks']
                 ],
                 "skills": parsed["skills"],
                 "experience": parsed["experience"],
-                "total_chunks": parsed["chunks"]
+                "total_chunks": len(parsed["chunks"])
             },
         }

@@ -34,7 +34,7 @@ def embed_resume_chunks(
     
     init_client()
     
-    chunks = parsed_resume[chunks]
+    chunks = parsed_resume["chunks"]
     
     texts_to_embed = [
         f"{chunk['section']}: {chunk['content']}"
@@ -72,6 +72,7 @@ def embed_resume_chunks(
         
     except Exception as e:
         print(f"Embedding failed: {e}")
+        raise
 
 
 def compute_similarity(embedding1: List[float], embedding2: List[float]) -> float:
