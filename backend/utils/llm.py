@@ -35,16 +35,9 @@ def get_chat_model(model_name: str="gemini-2.5-flash",
                    tools: Optional[List]=None) -> genai.GenerativeModel:
     """
     Get a Gemini model instance for chat/completion tasks.
-    Unsure if tools are going to be needed, but parameters are there just in case. 
+    Will add tools if needed.
     """
-    init_gemini_client()
-    
-    config = {"model_name": model_name}
-    if system_instruction:
-        config["system_instruction"] = system_instruction
-    if tools:
-        config["tools"] = tools
-        
+    init_gemini_client()    
     return genai.GenerativeModel(model_name)
 
 
