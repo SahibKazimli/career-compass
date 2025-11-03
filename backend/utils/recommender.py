@@ -33,6 +33,30 @@ def summarize_chunks(chunks: List[Dict[str, Any]], max_sections: int=6, max_char
         summaries.append((section, text))
     return summaries
 
+
+def _build_recommendations_prompt(
+    skills: List[str],
+    experience: List[str],
+    chunk_summaries: List[Tuple[str, str]],
+    user_interests: Optional[str] = None, 
+    current_role: Optional[str] = None
+) -> str: 
+    """
+    Constructs a compact, structured prompt for recommendations.
+    Embeddings are NOT included to keep tokens/cost low.
+    """
+    skills_block = "\n".join(f"- {s}" for s in skills) if skills else "None"
+    exp_block = "\n".join(f"- {e}" for e in experience) if experience else "None"
+
+    sections_block = "\n".join(
+        f"- {sec}: {txt}" for (sec, txt) in chunk_summaries
+    ) if chunk_summaries else "None"
+
+    interests = user_interests or "Not specified"
+    role = current_role or "Not specified"
+    
+    return RECOMMENDER_PROMPT        
+        
         
 
 def generate_recommendations(

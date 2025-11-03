@@ -59,8 +59,6 @@ class Recommendations(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-        
-
 # Create all tables 
 def init_db():
     Base.metadata.create_all(bind=engine)

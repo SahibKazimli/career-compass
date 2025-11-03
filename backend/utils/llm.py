@@ -59,30 +59,46 @@ Always provide actionable advice with specific next steps.
 
 
 RECOMMENDER_PROMPT = """
-    {context}
-    
-    Based on this background, provide:
-    1. Top 3-5 career paths that would be a good fit
-    2. For each path, explain why it's a good match
-    3. Key skills they already have for each path
-    4. Skills they need to develop for each path
-    5. Estimated transition difficulty (Easy/Medium/Hard)
-    
-    Format your response as JSON with this structure:
+User Background:
+- Current Role: {role}
+
+Skills:
+{skills_block}
+
+Experience:
+{exp_block}
+
+Resume Sections (summaries):
+{sections_block}
+
+User Interests:
+{interests}
+
+Based on the above, recommend 3-5 realistic career paths. For each:
+- title
+- match_reason (tie to their background)
+- relevant_existing_skills
+- skills_to_develop
+- transition_difficulty (Easy/Medium/Hard)
+- estimated_salary_range (rough)
+- first_steps (3 concrete actions)
+
+Return STRICT JSON only in this schema:
+{{
+  "recommendations": [
     {{
-        "recommendations": [
-            {{
-                "career_title": "Career Name",
-                "match_reason": "Why this is a good fit",
-                "existing_skills": ["skill1", "skill2"],
-                "skills_to_develop": ["skill1", "skill2"],
-                "difficulty": "Medium",
-                "salary_range": "Estimated range if known"
-            }}
-        ],
-        "summary": "Overall assessment and advice"
+      "title": "string",
+      "match_reason": "string",
+      "relevant_existing_skills": ["string"],
+      "skills_to_develop": ["string"],
+      "transition_difficulty": "Easy|Medium|Hard",
+      "estimated_salary_range": "string",
+      "first_steps": ["string", "string", "string"]
     }}
-    """
+  ],
+  "overall_assessment": "string"
+}}
+"""
 
 
     
