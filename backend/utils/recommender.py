@@ -1,7 +1,9 @@
-import google.generativeai as genai 
-from llm import RECOMMENDER_PROMPT, get_chat_model
-from typing import List, Dict, Tuple, Any, Optional
 import json
+import re
+from typing import List, Dict, Tuple, Any, Optional
+from sqlalchemy.orm import Session
+from db.database import Resume
+from llm import RECOMMENDER_PROMPT, get_chat_model
 
 
 
@@ -22,7 +24,7 @@ def summarize_chunks(chunks: List[Dict[str, Any]], max_sections: int=6, max_char
     Make chunk content compact for the LLM prompt.
     Prefer each chunk's summary if present; otherwise truncate content.
     """
-    summaries = List[tuple[str, str]] = []
+    summaries: List[tuple[str, str]] = []
     for ch in chunks[:max_sections]:
         section = ch.get("section", "Section")
         summary = ch.get("summary")
@@ -34,7 +36,7 @@ def summarize_chunks(chunks: List[Dict[str, Any]], max_sections: int=6, max_char
     return summaries
 
 
-def _build_recommendations_prompt(
+def build_recommendations_prompt(
     skills: List[str],
     experience: List[str],
     chunk_summaries: List[Tuple[str, str]],
@@ -45,7 +47,7 @@ def _build_recommendations_prompt(
     Constructs a compact, structured prompt for recommendations.
     Embeddings are NOT included to keep tokens/cost low.
     """
-    skills_block = "\n".join(f"- {s}" for s in skills) if skills else "None"
+    skills_block = "\n".join(f"- {skill}" for skill in skills) if skills else "None"
     exp_block = "\n".join(f"- {e}" for e in experience) if experience else "None"
 
     sections_block = "\n".join(
@@ -55,8 +57,33 @@ def _build_recommendations_prompt(
     interests = user_interests or "Not specified"
     role = current_role or "Not specified"
     
-    return RECOMMENDER_PROMPT        
+    return RECOMMENDER_PROMPT.format(
+        role=role,
+        skills_block=skills_block,
+        exp_block=exp_block,
+        sections_block=sections_block,
+        interests=interests
+    )   
         
+        
+        
+def load_resume_data_from_db(db: Session, user_id: int) -> Dict[str, Any]:
+    """Load the latest parsed resume for a user from DB."""
+    resume_row = (
+        db.query(Resume)
+          .filter(Resume.user_id == user_id)
+          .order_by(Resume.id.desc())
+          .first()
+    )
+    
+    if not resume_row:
+        raise ValueError(f"No resume found for user {user_id}")
+    
+    skills = _json_load_safe(resume_row.parsed_skills, default=[])
+    experience = _json_load_safe(resume_row.parsed_experience, default=[])
+    chunks = _json_load_safe(resume_row.embedding, default=[])
+    
+    return {"skills": skills, "experience": experience, "chunks": chunks}
         
 
 def generate_recommendations(
