@@ -84,6 +84,28 @@ def load_resume_data_from_db(db: Session, user_id: int) -> Dict[str, Any]:
     chunks = _json_load_safe(resume_row.embedding, default=[])
     
     return {"skills": skills, "experience": experience, "chunks": chunks}
+
+
+def _extract_json(text: str) -> Optional[dict]:
+    """Extract JSON from LLM response, handling markdown fences."""
+    if not text:
+        return None
+    
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except:
+        pass
+    
+    # Try extracting from ```json``` fences
+    match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except:
+            pass
+    
+    return None
         
 
 def generate_recommendations(
@@ -119,8 +141,18 @@ def generate_recommendations(
         
     model = get_chat_model(model_name)
     response = model.generate_content(prompt)
-    return response
     
+    parsed_response = _extract_json(getattr(response, "text", ""))
+    if not parsed_response: 
+        return {
+            "recommendations": [],
+            "overall_assessment": "",
+            "raw_response": getattr(response, "text", ""),
+            "model_used": model_name
+        }
+    
+    parsed_response["model_used"] = model_name
+    return parsed_response
     
     
     
