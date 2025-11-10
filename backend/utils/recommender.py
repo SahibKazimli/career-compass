@@ -87,8 +87,10 @@ def load_resume_data_from_db(db: Session, user_id: int) -> Dict[str, Any]:
         
 
 def generate_recommendations(
-    resume_data: Dict[str, Any],
+    db: Session,
+    user_id: int,
     user_interests: Optional[str] = None, 
+    current_role: Optional[str] = None,
     model_name: str = "gemini-2.5-flash"
 ) -> Dict[str, Any]:
     """
@@ -103,8 +105,22 @@ def generate_recommendations(
         Dictionary with career recommendations and reasoning
     """
     
-    model = get_chat_model(model_name)
+    resume_data = load_resume_data_from_db(db, user_id)
     
-    # Build context and parse resume
+    # Assemble prompt 
+    chunk_summaries = summarize_chunks(resume_data["chunks"])
+    prompt = build_recommendations_prompt(
+        skills=resume_data["skills"],
+        experience=resume_data["experience"],
+        chunk_summaries=chunk_summaries,
+        user_interests=user_interests,
+        current_role=current_role
+    )
+        
+    model = get_chat_model(model_name)
+    response = model.generate_content(prompt)
+    return response
+    
+    
     
     
