@@ -86,11 +86,10 @@ async def upload_resume(
     parsed = parse_upload(file)
     resume = Resume(
         user_id=user_id, 
-        raw_text=json.dumps(parsed["raw_text"]),
-        parsed_skills=json.dumps(parsed["skills"]),
-        parsed_experience=json.dumps(parsed["experience"]),            
-        embedding=json.dumps([chunk['embedding'] for chunk in parsed['chunks']])
-    )
+        raw_text=parsed["raw_text"],
+        parsed_skills=parsed["skills"],
+        parsed_experience=parsed["experience"],            
+        embedding=[chunk['embedding'] for chunk in parsed['chunks']])
     db.add(resume)
     db.commit()
     db.refresh(resume)

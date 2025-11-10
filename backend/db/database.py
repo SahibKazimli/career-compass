@@ -52,6 +52,7 @@ class Recommendations(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer)
+    raw_text = Column(Text)
     career_path_id = Column(Integer)
     similarity_score = Column(Float)
     skill_gaps = Column(Text)  # JSON string
