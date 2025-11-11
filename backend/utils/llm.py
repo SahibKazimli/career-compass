@@ -2,12 +2,42 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 import pathlib
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+import json
 
 """
 Central module for all LLM operations in Career Compass.
 Handles model initialization, chat interactions, prompts and tool definitions.
 """
+
+def _json_load_safe(value: Optional[str], default):
+    """
+    Safely json.loads() a DB Text field, returning a default on error/None.
+    """
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+
+def summarize_chunks(chunks: List[Dict[str, Any]], max_sections: int=6, max_chars_per_section = 700) -> List[Tuple[str, str]]:
+    """
+    Make chunk content compact for the LLM prompt.
+    Prefer each chunk's summary if present; otherwise truncate content.
+    """
+    summaries: List[tuple[str, str]] = []
+    for ch in chunks[:max_sections]:
+        section = ch.get("section", "Section")
+        summary = ch.get("summary")
+        content = ch.get("content", "")
+        text = (summary or content) or ""
+        if len(text) > max_chars_per_section:
+            text = text[:max_chars_per_section] + "…"
+        summaries.append((section, text))
+    return summaries
+
 
 
 def init_gemini_client():

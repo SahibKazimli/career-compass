@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.db.database import init_db, get_db, Resume  
-from backend.utils.recommender import generate_recommendations
+from backend.agents.recommender import generate_recommendations
 from contextlib import asynccontextmanager
 from backend.parsing.parsing_helpers import parse_upload  
 from typing import Optional
@@ -120,22 +120,22 @@ async def upload_resume(
     
     
 @app.get("/recommendations/{user_id}")
-def get_recommendations(
-    user_id: int,
-    interests: Optional[str] = None,
-    current_role: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Get career recommendations for a user based on their uploaded resume."""
-    try:
-        recommendations = generate_recommendations(
-            db=db,
-            user_id=user_id,
-            user_interests=interests,
-            current_role=current_role
-        )
-        return recommendations
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
+def get_recommendations(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get AI-powered career recommendations for a user based on their resume
+    """
+    
+    resume = db.query(Resume).filter(Resume.user_id == user_id).first()
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    
+    
+    skills = json.loads(resume.parsed_skills)
+    experience = json.loads(resume.parsed_experience)
+    
+    recommendations = generate_recommendations(skills, experience, resume.raw_text)
+    
+    return {
+        "user_id": user_id,
+        "recommendations": recommendations
+    }

@@ -3,37 +3,9 @@ import re
 from typing import List, Dict, Tuple, Any, Optional
 from sqlalchemy.orm import Session
 from backend.db.database import Resume
-from backend.utils.llm import RECOMMENDER_PROMPT, get_chat_model
+from backend.utils.llm import RECOMMENDER_PROMPT, get_chat_model, summarize_chunks, _json_load_safe
 
 
-
-def _json_load_safe(value: Optional[str], default):
-    """
-    Safely json.loads() a DB Text field, returning a default on error/None.
-    """
-    if not value:
-        return default
-    try:
-        return json.loads(value)
-    except Exception:
-        return default
-
-
-def summarize_chunks(chunks: List[Dict[str, Any]], max_sections: int=6, max_chars_per_section = 700) -> List[Tuple[str, str]]:
-    """
-    Make chunk content compact for the LLM prompt.
-    Prefer each chunk's summary if present; otherwise truncate content.
-    """
-    summaries: List[tuple[str, str]] = []
-    for ch in chunks[:max_sections]:
-        section = ch.get("section", "Section")
-        summary = ch.get("summary")
-        content = ch.get("content", "")
-        text = (summary or content) or ""
-        if len(text) > max_chars_per_section:
-            text = text[:max_chars_per_section] + "…"
-        summaries.append((section, text))
-    return summaries
 
 
 def build_recommendations_prompt(
@@ -45,7 +17,7 @@ def build_recommendations_prompt(
 ) -> str: 
     """
     Constructs a compact, structured prompt for recommendations.
-    Embeddings are NOT included to keep tokens/cost low.
+    Embeddings are NOT included at the moment.
     """
     skills_block = "\n".join(f"- {skill}" for skill in skills) if skills else "None"
     exp_block = "\n".join(f"- {e}" for e in experience) if experience else "None"
@@ -91,7 +63,6 @@ def _extract_json(text: str) -> Optional[dict]:
     if not text:
         return None
     
-    # Try direct parse first
     try:
         return json.loads(text)
     except:
