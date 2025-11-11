@@ -1,10 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
-from db.database import init_db, get_db, Resume
+from backend.db.database import init_db, get_db, Resume  
 from contextlib import asynccontextmanager
-from parsing.parsing_helpers import parse_upload
-import json
-import os
+from backend.parsing.parsing_helpers import parse_upload  
+from typing import Optional
+
 
 app = FastAPI(title="Career Compass")
 

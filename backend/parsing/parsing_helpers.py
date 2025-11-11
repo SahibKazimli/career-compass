@@ -1,8 +1,8 @@
 from fastapi import UploadFile, File
 import tempfile
 import os
-from resume_parser import genai_parse_pdf
-from utils.embeddings import embed_resume_chunks
+from backend.parsing.resume_parser import genai_parse_pdf
+from backend.utils.embeddings import embed_resume_chunks
 
 
 def parse_upload(file: UploadFile = File(...)):

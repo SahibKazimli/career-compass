@@ -2,8 +2,8 @@ import json
 import re
 from typing import List, Dict, Tuple, Any, Optional
 from sqlalchemy.orm import Session
-from db.database import Resume
-from llm import RECOMMENDER_PROMPT, get_chat_model
+from backend.db.database import Resume
+from backend.utils.llm import RECOMMENDER_PROMPT, get_chat_model
 
 
 

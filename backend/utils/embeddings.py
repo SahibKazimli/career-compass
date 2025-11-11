@@ -2,7 +2,7 @@ import google.generativeai as genai
 import numpy as np
 from dotenv import load_dotenv
 import pathlib
-from typing import List, Dict
+from typing import List, Dict, Any
 
 """For now, I'll implement chunking and embedding for the resume uploads, as
 well as the user inputs to the LLM. The webscraping will be implemented later, after
@@ -18,9 +18,9 @@ def init_client():
 
 
 def embed_resume_chunks(
-    parsed_resume: Dict[str],
+    parsed_resume: Dict[str, Any],
     model: str = "models/text-embedding-004",
-) -> Dict[str]:
+) -> Dict[str, Any]:
     """
     Embed all chunks from a parsed resume.
     
