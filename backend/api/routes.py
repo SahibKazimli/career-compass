@@ -81,7 +81,7 @@ async def upload_resume(
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
     
-    user_check = db.execute(text("SELECT id FROM users WHERE id = :user_id", {"user_id":user_id}))
+    user_check = db.execute(text("SELECT id FROM users WHERE id = :user_id"), {"user_id":user_id})
     if not user_check:
         raise HTTPException(status_code=404, detail="User not found")
 

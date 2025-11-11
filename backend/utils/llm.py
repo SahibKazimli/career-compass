@@ -100,8 +100,6 @@ Return STRICT JSON only in this schema:
 }}
 """
 
-
-    
 SKILL_ANALYZER_SYSTEM_PROMPT = """
 You are a technical skill analyst with deep knowledge of various industries and roles.
 Your role is to:
