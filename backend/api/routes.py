@@ -1,10 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from backend.db.database import init_db, get_db, Resume  
 from backend.utils.recommender import generate_recommendations
 from contextlib import asynccontextmanager
 from backend.parsing.parsing_helpers import parse_upload  
 from typing import Optional
+import json
 
 
 @asynccontextmanager
@@ -30,11 +32,11 @@ def read_root():
 def create_user(email:str, name:str, db: Session=Depends(get_db)):
 
     # Create a new user
-    query = "INSERT INTO users (email, name, created_at) VALUES (:email, :name, datetime('now'))"
+    query = text("INSERT INTO users (email, name, created_at) VALUES (:email, :name, datetime('now'))")
     db.execute(query, {"email": email, "name": name})
     db.commit()
     
-    result = db.execute("SELECT last_insert_rowid()")
+    result = db.execute(text("SELECT last_insert_rowid()"))
     user_id = next(result)[0]
     
     return {"id": user_id, "email": email, "name": name}
@@ -49,8 +51,8 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     Queries the database for the user and returns their ID, email, name, and creation timestamp.
     """
     
-    query = "SELECT * FROM users WHERE id = :user_id"
-    result = db.execute(query, {"id": user_id})
+    query = text("SELECT * FROM users WHERE id = :user_id")
+    result = db.execute(query, {"user_id": user_id})
     rows = list(result)
     
     if not rows: 
@@ -79,7 +81,7 @@ async def upload_resume(
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
     
-    user_check = db.execute("SELECT id FROM users WHERE id = :user_id", {"user_id":user_id})
+    user_check = db.execute(text("SELECT id FROM users WHERE id = :user_id", {"user_id":user_id}))
     if not user_check:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -88,9 +90,9 @@ async def upload_resume(
     resume = Resume(
         user_id=user_id, 
         raw_text=parsed["raw_text"],
-        parsed_skills=parsed["skills"],
-        parsed_experience=parsed["experience"],            
-        embedding=[chunk['embedding'] for chunk in parsed['chunks']])
+        parsed_skills=json.dumps(parsed["skills"]),
+        parsed_experience=json.dumps(parsed["experience"]),            
+        embedding=json.dumps(parsed["chunks"]))
     db.add(resume)
     db.commit()
     db.refresh(resume)
