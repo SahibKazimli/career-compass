@@ -5,7 +5,7 @@ from backend.db.database import init_db, get_db, Resume
 from backend.agents.recommender import generate_recommendations
 from contextlib import asynccontextmanager
 from backend.parsing.parsing_helpers import parse_upload  
-from typing import Optional
+from agents.resume_analyzer import analyze_resume_deep
 import json
 
 
@@ -138,4 +138,42 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
     return {
         "user_id": user_id,
         "recommendations": recommendations
+    }
+    
+    
+@app.get("/resume/analyze/{user_id}")
+def analyze_resume(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get deep AI analysis of a user's resume including:
+    - Core competencies
+    - Career progression patterns
+    - Strengths and areas for development
+    - Potential career pivots
+    - Actionable resume improvements
+    """
+    
+    # Load the most recent resume for the user
+    resume = (
+        db.query(Resume)
+        .filter(Resume.user_id == user_id)
+        .order_by(Resume.id.desc())
+        .first()
+    )
+    
+    if not resume:
+        raise HTTPException(status_code=404, detail="No resume found for this user")
+    
+    # Parse the stored chunks (they're stored as JSON string)
+    chunks = json.loads(resume.embedding)
+    
+    # Call the analyzer
+    analysis = analyze_resume_deep(
+        raw_text=resume.raw_text,
+        sections=chunks
+    )
+    
+    return {
+        "user_id": user_id,
+        "resume_id": resume.id,
+        "analysis": analysis
     }

@@ -1,8 +1,5 @@
 import google.generativeai as genai
 from backend.utils.llm import RESUME_ANALYZER_PROMPT
-from typing import List, Dict, Tuple, Any, Optional
-from sqlalchemy.orm import Session
-from backend.db.database import Resume
 from dotenv import load_dotenv
 import os
 import json
@@ -12,7 +9,7 @@ genai.configure(api_key=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
 
 
-def analyze_resume_deep(raw_text: str, sections: list) -> dict:
+def analyze_resume_deep(sections: list) -> dict:
     """
     Deep analysis of resume to extract insights from already parsed sections.
     sections is the list you stored (chunks with {section, content, summary}).

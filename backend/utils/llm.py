@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import json
 
 """
-Central module for all LLM operations in Career Compass.
+Central module for LLM operations in Career Compass.
 Handles model initialization, chat interactions, prompts and tool definitions.
 """
 
