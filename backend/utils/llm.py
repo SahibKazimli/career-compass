@@ -50,7 +50,7 @@ def init_gemini_client():
     if env_path.exists():
         load_dotenv(env_path)
     else:
-        load_dotenv()  # Fallback
+        load_dotenv()  
         
     api_key = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     if not api_key:
@@ -142,7 +142,7 @@ Your role is to:
 Be precise and data-driven in your assessments.
 """
 
-RESUME_ANALYZER_SYSTEM_PROMPT = """
+RESUME_ANALYZER_PROMPT = """
 You are an expert resume analyst and career counselor.
 Analyze resumes to extract:
 - Core competencies and technical skills
