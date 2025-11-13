@@ -5,8 +5,10 @@ from backend.db.database import init_db, get_db, Resume
 from backend.agents.recommender import generate_recommendations
 from contextlib import asynccontextmanager
 from backend.parsing.parsing_helpers import parse_upload  
-from agents.resume_analyzer import analyze_resume_deep
+from backend.agents.resume_analyzer import analyze_resume_deep
 import json
+from fastapi.middleware.cors import CORSMiddleware
+
 
 
 @asynccontextmanager
@@ -21,6 +23,16 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
     
 app = FastAPI(title="Career Compass", lifespan=lifespan)
+
+# 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # All origins for dev
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 @app.get("/")
@@ -177,3 +189,25 @@ def analyze_resume(user_id: int, db: Session = Depends(get_db)):
         "resume_id": resume.id,
         "analysis": analysis
     }
+    
+    
+@app.get("/skills/analyze/{user_id}")
+def analyze_skills(user_id: int, target_role: str = None, db: Session = Depends(get_db)):
+    """
+    Analyze user's skills with optional target role comparison
+    """
+    
+    resume = db.query(Resume).filter(Resume.user_id == user_id).first()
+    if not resume: 
+        raise HTTPException(status_code=404, detail="Resume not found")
+    
+    skills = json.loads(resume.parsed_skills)
+    analysis = analyze_resume_deep(skills)
+    
+    return {
+        "user_id": user_id, 
+        "target_role": target_role, 
+        "skills_analysis": analysis
+    }
+    
+    
