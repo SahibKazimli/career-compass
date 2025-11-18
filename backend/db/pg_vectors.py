@@ -81,4 +81,69 @@ def insert_resume_with_chunks(
             )
     conn.commit()
     return inserted_resume_id
+
+
+def fetch_latest_resume(conn, user_id: int) -> Optional[dict]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT * FROM resumes
+            WHERE user_id = %s
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        return cur.fetchone()
+
+
+def fetch_resume_chunks(conn, resume_id: int) -> List[dict]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, section, content, summary
+            FROM resume_chunks
+            WHERE resume_id = %s
+            ORDER BY id ASC
+            """,
+            (resume_id,),
+        )
+        return cur.fetchall()
+
+
+def search_similar_chunks(
+    conn,
+    query_embedding: List[float],
+    user_id: Optional[int] = None,
+    limit: int = 5,
+) -> List[dict]:
+    """
+    ANN search using cosine distance. If user_id provided, restrict to that user's resumes.
+    """
+    with conn.cursor() as cur:
+        if user_id is None:
+            cur.execute(
+                """
+                SELECT rc.id, rc.resume_id, rc.section, rc.summary, rc.content,
+                       (rc.embedding <-> %s) AS distance
+                FROM resume_chunks rc
+                ORDER BY rc.embedding <-> %s
+                LIMIT %s
+                """,
+                (query_embedding, query_embedding, limit),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT rc.id, rc.resume_id, rc.section, rc.summary, rc.content,
+                       (rc.embedding <-> %s) AS distance
+                FROM resume_chunks rc
+                JOIN resumes r ON r.id = rc.resume_id
+                WHERE r.user_id = %s
+                ORDER BY rc.embedding <-> %s
+                LIMIT %s
+                """,
+                (query_embedding, user_id, query_embedding, limit),
+            )
+        return cur.fetchall()
     
