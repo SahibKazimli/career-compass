@@ -1,20 +1,25 @@
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
+from pgvector.sqlalchemy import Vector
 from datetime import datetime
+from pathlib import Path
+import os
 
-# For MVP - storing everything in one database 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./career_compass.db"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://career_user:career_pass@localhost:5432/career_compass"
+)
 
 # check_same_thread = False, required for FastAPI
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread":False}
+    DATABASE_URL, connect_args={"check_same_thread":False}
 )
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Database Models
+
 class User(Base):
     __tablename__ = "users"
     
@@ -60,9 +65,42 @@ class Recommendations(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-# Create all tables 
+
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    """
+    Initialize database by running schema.sql.
+    Safe to run multiple times (uses IF NOT EXISTS).
+    """
+    try:
+        schema_path = Path(__file__).parent / "schema.sql"
+        
+        if not schema_path.exists():
+            raise FileNotFoundError(f"schema.sql not found at {schema_path}")
+        
+        print(f"Reading schema from: {schema_path}")
+        
+        with open(schema_path, "r") as f:
+            schema_sql = f.read()
+        
+        # Execute schema.sql
+        with engine.connect() as conn:
+            # Split by semicolon and execute each statement
+            statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
+            
+            for i, statement in enumerate(statements, 1):
+                print(f"Executing statement {i}/{len(statements)}...")
+                conn.execute(text(statement))
+            
+            conn.commit()
+        
+        print("Database initialized successfully from schema.sql")
+        print("pgvector extension enabled")
+        print("All tables and indexes created")
+        
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
+        raise
+    
     
     
 def get_db():
