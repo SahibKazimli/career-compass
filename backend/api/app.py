@@ -1,15 +1,32 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from backend.db.database import init_db, get_db, Resume  
-from backend.agents.recommender import generate_recommendations
-from contextlib import asynccontextmanager
-from backend.parsing.parsing_helpers import parse_upload  
-from backend.agents.resume_analyzer import analyze_resume_deep
 import json
+from contextlib import asynccontextmanager
+from typing import Optional
+
+# --- FastAPI ---
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 
+# --- Internal Modules: Database ---
+from backend.db.database import init_db, get_db, Resume
+from backend.db.pg import init_db, get_conn
+from backend.db.pg_vectors import (
+    insert_user,
+    get_user,
+    insert_resume_with_chunks,
+    fetch_latest_resume,
+    fetch_resume_chunks,
+    search_similar_chunks,
+)
+
+# --- Internal Modules: Agents & Parsing ---
+from backend.agents.recommender import generate_recommendations
+from backend.agents.resume_analyzer import analyze_resume_deep
+from backend.parsing.parsing_helpers import parse_upload
+
+# --- Embeddings / AI ---
+from backend.utils.embeddings import init_client
+import google.generativeai as genai
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,7 +41,7 @@ async def lifespan(app: FastAPI):
     
 app = FastAPI(title="Career Compass", lifespan=lifespan)
 
-# 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # All origins for dev
@@ -41,78 +58,60 @@ def read_root():
 
 
 @app.post("/users")
-def create_user(email:str, name:str, db: Session=Depends(get_db)):
-
-    # Create a new user
-    query = text("INSERT INTO users (email, name, created_at) VALUES (:email, :name, datetime('now'))")
-    db.execute(query, {"email": email, "name": name})
-    db.commit()
-    
-    result = db.execute(text("SELECT last_insert_rowid()"))
-    user_id = next(result)[0]
-    
-    return {"id": user_id, "email": email, "name": name}
+def create_user(email: str, name: str, conn = Depends(get_conn)):
+    user_id = insert_user(conn, email=email, name=name)
+    return {"user_id": user_id, "email": email, "name": name}
     
     
 
 
 @app.get("/users/{user_id}")
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, conn = Depends(get_conn)):
     """
     Retrieve user information by user ID.
     Queries the database for the user and returns their ID, email, name, and creation timestamp.
     """
     
-    query = text("SELECT * FROM users WHERE id = :user_id")
-    result = db.execute(query, {"user_id": user_id})
-    rows = list(result)
-    
-    if not rows: 
-        raise HTTPException(status_code=404, detail="user not found")
-    user = rows[0]
-    
-    return {
-        "id": user[0],
-        "email": user[1],
-        "name": user[2],
-        "created_at": str(user[3]) if user[3] else None
-    }    
+    row = get_user(conn, user_id)
+    if not row: 
+        raise HTTPException(status_code=404, detail="User not found")
+    return row
     
     
 @app.post("/resume/upload")
 async def upload_resume(
     user_id: int, 
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    conn = Depends(get_conn)
 ):
     """
     Upload and process a user's resume file.
     Validates that the file is a PDF, checks if the user exists, parses the resume content,
     stores the parsed data in the database, and returns a summary including parsed chunks, skills, and experience.
     """
+    
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
     
-    user_check = db.execute(text("SELECT id FROM users WHERE id = :user_id"), {"user_id":user_id})
-    if not user_check:
+    if not get_user(conn, user_id):
         raise HTTPException(status_code=404, detail="User not found")
+        
 
-
-    parsed = parse_upload(file)
-    resume = Resume(
-        user_id=user_id, 
+    parsed = parse_upload(file) # returns raw_text, skills, experience, chunks (with embeddings)
+    
+    resume_id = insert_resume_with_chunks(
+        conn=conn,
+        user_id=user_id,
         raw_text=parsed["raw_text"],
-        parsed_skills=json.dumps(parsed["skills"]),
-        parsed_experience=json.dumps(parsed["experience"]),            
-        embedding=json.dumps(parsed["chunks"]))
-    db.add(resume)
-    db.commit()
-    db.refresh(resume)
+        parsed_skills_text=json.dumps(parsed["skills"]),
+        parsed_experience_text=json.dumps(parsed["experience"]),
+        chunks=parsed["chunks"],  # each has section, content, summary, embedding(list[float])
+    )
     
     
     return {
             "message": "Resume uploaded and processed successfully",
-            "resume_id": resume.id,
+            "resume_id": resume_id,
             "filename": file.filename,
             "parsed_data": {
                 "chunks": [
@@ -132,29 +131,40 @@ async def upload_resume(
     
     
 @app.get("/recommendations/{user_id}")
-def get_recommendations(user_id: int, db: Session = Depends(get_db)):
+def get_recommendations(user_id: int, conn = Depends(get_db)):
     """
-    Get AI-powered career recommendations for a user based on their resume
+    Get recommendations input data from Postgres (no agents/AI yet).
+    Returns parsed skills/experience and an empty recommendations list.
     """
-    
-    resume = db.query(Resume).filter(Resume.user_id == user_id).first()
+   
+    resume = fetch_latest_resume(conn, user_id)
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
+
     
-    
-    skills = json.loads(resume.parsed_skills)
-    experience = json.loads(resume.parsed_experience)
-    
-    recommendations = generate_recommendations(skills, experience, resume.raw_text)
-    
+    try:
+        skills = json.loads(resume.get("parsed_skills") or "[]")
+    except Exception:
+        skills = []
+
+    try:
+        experience = json.loads(resume.get("parsed_experience") or "[]")
+    except Exception:
+        experience = []
+
     return {
         "user_id": user_id,
-        "recommendations": recommendations
+        "resume_id": resume["id"],
+        "skills": skills,
+        "experience": experience,
+        "recommendations": [],  # placeholder until AI is implemented
+        "status": "not_implemented"
     }
     
     
+    
 @app.get("/resume/analyze/{user_id}")
-def analyze_resume(user_id: int, db: Session = Depends(get_db)):
+def analyze_resume(user_id: int, conn = Depends(get_db)):
     """
     Get deep AI analysis of a user's resume including:
     - Core competencies
@@ -164,50 +174,32 @@ def analyze_resume(user_id: int, db: Session = Depends(get_db)):
     - Actionable resume improvements
     """
     
-    # Load the most recent resume for the user
-    resume = (
-        db.query(Resume)
-        .filter(Resume.user_id == user_id)
-        .order_by(Resume.id.desc())
-        .first()
-    )
-    
+    resume = fetch_latest_resume(conn, user_id)    
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found for this user")
     
-    # Parse the stored chunks (they're stored as JSON string)
-    chunks = json.loads(resume.embedding)
+    chunks = fetch_resume_chunks(conn, resume_id=resume["id"])
     
-    # Call the analyzer
     analysis = analyze_resume_deep(
-        raw_text=resume.raw_text,
-        sections=chunks
+        raw_text=resume.get("raw_text") or "",
+        sections=[{"section": chunk["section"], "summary": chunk["summary"], "content": chunk["content"]} for chunk in chunks],
     )
     
-    return {
-        "user_id": user_id,
-        "resume_id": resume.id,
-        "analysis": analysis
-    }
+    return {"user_id": user_id, 
+            "resume_id": resume["id"], 
+            "analysis": analysis}
     
     
-@app.get("/skills/analyze/{user_id}")
-def analyze_skills(user_id: int, target_role: str = None, db: Session = Depends(get_db)):
-    """
-    Analyze user's skills with optional target role comparison
-    """
+@app.get("/search/chunks")
+def search_chunks(
+    query: str = Query(..., description="Natural language query"),
+    user_id: Optional[int] = Query(None),
+    conn = Depends(get_conn),
+):
     
-    resume = db.query(Resume).filter(Resume.user_id == user_id).first()
-    if not resume: 
-        raise HTTPException(status_code=404, detail="Resume not found")
-    
-    skills = json.loads(resume.parsed_skills)
-    analysis = analyze_resume_deep(skills)
-    
-    return {
-        "user_id": user_id, 
-        "target_role": target_role, 
-        "skills_analysis": analysis
-    }
-    
+    init_client()
+    embeddings = genai.embed_content(model="models/text-embedding-004", content=query)["embedding"]
+
+    rows = search_similar_chunks(conn, query_embedding=embeddings, user_id=user_id, limit=10)
+    return {"query": query, "results": rows}
     

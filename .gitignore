@@ -1,5 +1,6 @@
 # Python
 __pychache__/
+__pychache__
 *.pyc
 venv/
 *.venv/
