@@ -54,3 +54,59 @@ def mark_event_status(conn: Connection, event_id: str, status: str):
             (status, event_id)
         )
     conn.commit()
+    
+    
+def increment_attempts(conn, event_id: str):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE agent_events
+            SET attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE event_id = %s
+            """,
+            (event_id,)
+        )
+    conn.commit()
+    
+
+def append_run_state(conn, run_id: str, patch: Dict[str, Any]):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE agent_runs
+            SET state = COALESCE(state, '{}'::jsonb) || %s::jsonb,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE run_id = %s
+            """,
+            (json.dumps(patch), run_id)
+        )
+    conn.commit()
+    
+
+def create_run(conn, user_id: int, target_role: str) -> str:
+    run_id = str(uuid4())
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO agent_runs (run_id, user_id, target_role)
+            VALUES (%s, %s, %s)
+            RETURNING run_id
+            """,
+            (run_id, user_id, target_role)
+        )
+        rid = cur.fetchone()["run_id"]
+    conn.commit()
+    return rid
+
+
+def mark_run_status(conn, run_id: str, status: str):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE agent_runs
+            SET status = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE run_id = %s
+            """,
+            (status, run_id)
+        )
+    conn.commit()
