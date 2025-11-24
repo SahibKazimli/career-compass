@@ -56,7 +56,7 @@ def mark_event_status(conn: Connection, event_id: str, status: str):
     conn.commit()
     
     
-def increment_attempts(conn, event_id: str):
+def increment_attempts(conn: Connection, event_id: str):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -69,7 +69,7 @@ def increment_attempts(conn, event_id: str):
     conn.commit()
     
 
-def append_run_state(conn, run_id: str, patch: Dict[str, Any]):
+def append_run_state(conn: Connection, run_id: str, patch: Dict[str, Any]):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -83,7 +83,7 @@ def append_run_state(conn, run_id: str, patch: Dict[str, Any]):
     conn.commit()
     
 
-def create_run(conn, user_id: int, target_role: str) -> str:
+def create_run(conn: Connection, user_id: int, target_role: str) -> str:
     run_id = str(uuid4())
     with conn.cursor() as cur:
         cur.execute(
@@ -99,7 +99,7 @@ def create_run(conn, user_id: int, target_role: str) -> str:
     return rid
 
 
-def mark_run_status(conn, run_id: str, status: str):
+def mark_run_status(conn: Connection, run_id: str, status: str):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -110,3 +110,28 @@ def mark_run_status(conn, run_id: str, status: str):
             (status, run_id)
         )
     conn.commit()
+    
+def update_run_state(conn: Connection, run_id: str, patch: Dict[str, Any], status: str | None = None):
+    # Merge JSON state using Postgres operator ||
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE agent_runs
+            SET state = COALESCE(state, '{}'::jsonb) || %s::jsonb,
+                status = COALESCE(%s, status),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE run_id = %s
+            """,
+            (json.dumps(patch), status, run_id)
+        )
+    conn.commit()
+
+
+def fetch_run(conn: Connection, run_id: str) -> dict | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM agent_runs WHERE run_id = %s LIMIT 1",
+            (run_id,)
+        )
+        return cur.fetchone()
+        
