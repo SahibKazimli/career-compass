@@ -148,6 +148,7 @@ class Orchestrator:
         resume_id: Optional[int],
         payload: Dict[str, Any],
     ) -> None:
+        # Handle resume upload: parse raw text and trigger resume_parsed
         if user_id is None:
             raise ValueError("resume_uploaded requires user_id")
 
@@ -196,6 +197,7 @@ class Orchestrator:
         resume_id: Optional[int],
         payload: Dict[str, Any],
     ) -> None:
+        # Handle parsed resume: analyze skills and trigger skills_analyzed
         if user_id is None or resume_id is None:
             raise ValueError("resume_parsed requires user_id and resume_id")
 
@@ -230,3 +232,12 @@ class Orchestrator:
             run_id=run_id,
             payload={"skills": skills_result},
         )
+        
+        
+    def _on_recommendations_ready(
+        self,
+        conn,
+        run_id: Optional[str],
+        payload: Dict[str, Any],
+    ) -> None:
+        print(f"[orchestrator] recommendations_ready for run_id={run_id}")
