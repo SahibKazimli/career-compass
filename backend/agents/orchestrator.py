@@ -139,3 +139,94 @@ class Orchestrator:
                 run_id=run_id,
                 payload={},
             )
+
+
+    def _on_resume_uploaded(
+        self,
+        conn,
+        user_id: Optional[int],
+        resume_id: Optional[int],
+        payload: Dict[str, Any],
+    ) -> None:
+        if user_id is None:
+            raise ValueError("resume_uploaded requires user_id")
+
+        if resume_id is None:
+            row = fetch_latest_resume(conn, user_id=user_id)
+            if not row:
+                raise ValueError(f"No resume found for user_id={user_id}")
+            resume_id = row["id"]
+        else:
+            row = fetch_latest_resume(conn, user_id=user_id)
+
+        raw_text = row.get("raw_text") if row else None
+        if not raw_text:
+            raise ValueError(f"Resume {resume_id} for user {user_id} has no raw_text")
+
+        parsed = parse_upload(raw_text)
+        deep_analysis = analyze_resume_deep(parsed)
+
+        run_id = payload.get("run_id") or row.get("run_id")
+        if run_id:
+            append_run_state(
+                conn,
+                run_id,
+                {
+                    "status": "resume_parsed",
+                    "resume_id": resume_id,
+                    "parsed": deep_analysis,
+                },
+            )
+
+        publish_event(
+            conn,
+            event_type="resume_parsed",
+            user_id=user_id,
+            resume_id=resume_id,
+            run_id=run_id,
+            payload={"parsed": deep_analysis},
+        )
+        
+        
+    
+    def _on_resume_parsed(
+        self,
+        conn,
+        user_id: Optional[int],
+        resume_id: Optional[int],
+        payload: Dict[str, Any],
+    ) -> None:
+        if user_id is None or resume_id is None:
+            raise ValueError("resume_parsed requires user_id and resume_id")
+
+        parsed = payload.get("parsed")
+        if parsed is None:
+            row = fetch_latest_resume(conn, user_id=user_id)
+            chunks = fetch_resume_chunks(conn, resume_id=resume_id)
+            parsed = {
+                "raw_text": row.get("raw_text") if row else "",
+                "chunks": chunks,
+            }
+
+        skills_result = analyze_skills(parsed)
+
+        run_id = payload.get("run_id")
+        if run_id:
+            append_run_state(
+                conn,
+                run_id,
+                {
+                    "status": "skills_analyzed",
+                    "resume_id": resume_id,
+                    "skills": skills_result,
+                },
+            )
+        
+        publish_event(
+            conn,
+            event_type="skills_analyzed",
+            user_id=user_id,
+            resume_id=resume_id,
+            run_id=run_id,
+            payload={"skills": skills_result},
+        )
