@@ -77,3 +77,65 @@ class Orchestrator:
             conn.close()
 
         return processed
+    
+    
+    def _handle_event(self, conn, event: Dict[str, Any]) -> None:
+        event_type = event["event_type"]
+        user_id: Optional[int] = event.get("user_id")
+        resume_id: Optional[int] = event.get("resume_id")
+        run_id: Optional[str] = event.get("run_id")
+        payload: Dict[str, Any] = event.get("payload") or {}
+
+        if event_type == "start_career_run":
+            self._on_start_career_run(conn, user_id=user_id, payload=payload)
+
+        elif event_type == "resume_uploaded":
+            self._on_resume_uploaded(conn, user_id=user_id, resume_id=resume_id, payload=payload)
+
+        elif event_type == "resume_parsed":
+            self._on_resume_parsed(conn, user_id=user_id, resume_id=resume_id, payload=payload)
+
+        elif event_type == "skills_analyzed":
+            self._on_skills_analyzed(conn, user_id=user_id, resume_id=resume_id, payload=payload)
+
+        elif event_type == "recommendations_ready":
+            self._on_recommendations_ready(conn, run_id=run_id, payload=payload)
+
+        else:
+            print(f"[orchestrator] Ignoring unknown event_type={event_type}")
+            
+    
+    def _on_start_career_run(
+        self,
+        conn,
+        user_id: Optional[int],
+        payload: Dict[str, Any],
+    ) -> None:
+        if user_id is None:
+            raise ValueError("start_career_run requires user_id")
+
+        target_role = payload.get("target_role", "career_change")
+        notes = payload.get("notes")
+        resume_id = payload.get("resume_id")
+
+        run_id = create_run(conn, user_id=user_id, target_role=target_role)
+        append_run_state(
+            conn,
+            run_id,
+            {
+                "status": "started",
+                "target_role": target_role,
+                "notes": notes,
+                "resume_id": resume_id,
+            },
+        )
+
+        if resume_id is not None:
+            publish_event(
+                conn,
+                event_type="resume_uploaded",
+                user_id=user_id,
+                resume_id=resume_id,
+                run_id=run_id,
+                payload={},
+            )
