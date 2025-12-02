@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 from backend.db.pg import get_conn
 from backend.db.events import (
@@ -19,7 +19,6 @@ from backend.parsing.parsing_helpers import parse_upload
 from backend.agents.resume_analyzer import analyze_resume_deep
 from backend.agents.skills_agent import analyze_skills
 from backend.agents.recommender import generate_recommendations
-from backend.utils.llm import _json_load_safe
 
 
 class Orchestrator:
@@ -36,7 +35,7 @@ class Orchestrator:
     def __init__(self, max_events_per_tick: int = 10, max_attempts: int = 3):
         self.max_events_per_tick = max_events_per_tick
         self.max_attempts = max_attempts
-    
+
     def tick(self) -> int:
         """
         Process up to `max_events_per_tick` pending events once.
@@ -68,7 +67,7 @@ class Orchestrator:
                     processed += 1
 
                 except Exception as e:
-                    # TODO: need to implement proper logging maybe?
+                    # TODO: replace with proper logging
                     print(f"[orchestrator] Error handling event {event_id}: {e}")
                     mark_event_status(conn, event_id, "error")
 
@@ -77,13 +76,14 @@ class Orchestrator:
             conn.close()
 
         return processed
-    
-    
+
     def _handle_event(self, conn, event: Dict[str, Any]) -> None:
         event_type = event["event_type"]
         user_id: Optional[int] = event.get("user_id")
         resume_id: Optional[int] = event.get("resume_id")
         run_id: Optional[str] = event.get("run_id")
+        
+        # events.payload is stored as JSON in DB; repo helpers treat it as dict already
         payload: Dict[str, Any] = event.get("payload") or {}
 
         if event_type == "start_career_run":
@@ -103,8 +103,7 @@ class Orchestrator:
 
         else:
             print(f"[orchestrator] Ignoring unknown event_type={event_type}")
-            
-    
+
     def _on_start_career_run(
         self,
         conn,
@@ -140,7 +139,6 @@ class Orchestrator:
                 payload={},
             )
 
-
     def _on_resume_uploaded(
         self,
         conn,
@@ -164,8 +162,9 @@ class Orchestrator:
         if not raw_text:
             raise ValueError(f"Resume {resume_id} for user {user_id} has no raw_text")
 
-        parsed = parse_upload(raw_text)
-        deep_analysis = analyze_resume_deep(parsed)
+        # parse_upload is expected to return a list of chunks
+        parsed_sections = parse_upload(raw_text)
+        deep_analysis = analyze_resume_deep(parsed_sections)
 
         run_id = payload.get("run_id") or row.get("run_id")
         if run_id:
@@ -187,9 +186,7 @@ class Orchestrator:
             run_id=run_id,
             payload={"parsed": deep_analysis},
         )
-        
-        
-    
+
     def _on_resume_parsed(
         self,
         conn,
@@ -223,7 +220,7 @@ class Orchestrator:
                     "skills": skills_result,
                 },
             )
-        
+
         publish_event(
             conn,
             event_type="skills_analyzed",
@@ -232,8 +229,49 @@ class Orchestrator:
             run_id=run_id,
             payload={"skills": skills_result},
         )
-        
-        
+
+    def _on_skills_analyzed(
+        self,
+        conn,
+        user_id: Optional[int],
+        resume_id: Optional[int],
+        payload: Dict[str, Any],
+    ) -> None:
+        if user_id is None:
+            raise ValueError("skills_analyzed requires user_id")
+
+        user_interests = payload.get("user_interests")
+        current_role = payload.get("current_role")
+
+        # Pure Postgres: pass the existing psycopg Connection
+        recs = generate_recommendations(
+            conn=conn,
+            user_id=user_id,
+            user_interests=user_interests,
+            current_role=current_role,
+        )
+
+        run_id = payload.get("run_id")
+        if run_id:
+            append_run_state(
+                conn,
+                run_id,
+                {
+                    "status": "recommendations_ready",
+                    "recommendations": recs,
+                },
+            )
+            mark_run_status(conn, run_id, "completed")
+
+        publish_event(
+            conn,
+            event_type="recommendations_ready",
+            user_id=user_id,
+            resume_id=resume_id,
+            run_id=run_id,
+            payload={"recommendations": recs},
+        )
+
     def _on_recommendations_ready(
         self,
         conn,
