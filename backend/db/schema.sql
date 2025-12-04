@@ -57,47 +57,12 @@ CREATE TABLE IF NOT EXISTS recommendations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Events (multi-agent protocol)
-CREATE TABLE IF NOT EXISTS agent_events (
-    id SERIAL PRIMARY KEY,
-    event_id UUID DEFAULT gen_random_uuid() UNIQUE,
-    event_type VARCHAR(120) NOT NULL,
-    user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
-    resume_id INTEGER REFERENCES resumes(resume_id) ON DELETE CASCADE,
-    run_id UUID,
-    payload JSONB,
-    status VARCHAR(32) DEFAULT 'pending',   -- pending | processing | done | failed | dead
-    attempts INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS agent_runs (
-    id SERIAL PRIMARY KEY,
-    run_id UUID DEFAULT gen_random_uuid() UNIQUE,
-    user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
-    target_role VARCHAR(255),
-    state JSONB DEFAULT '{}'::jsonb,
-    status VARCHAR(32) DEFAULT 'in_progress',  -- in_progress | completed | failed
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Standard indexes
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_resumes_user_id ON resumes(user_id);
 CREATE INDEX IF NOT EXISTS idx_resume_chunks_resume_id ON resume_chunks(resume_id);
 CREATE INDEX IF NOT EXISTS idx_recommendations_user_id ON recommendations(user_id);
 CREATE INDEX IF NOT EXISTS idx_career_paths_title ON career_paths(title);
-CREATE INDEX IF NOT EXISTS idx_agent_events_type ON agent_events(event_type);
-CREATE INDEX IF NOT EXISTS idx_agent_events_status ON agent_events(status);
-CREATE INDEX IF NOT EXISTS idx_agent_events_resume ON agent_events(resume_id);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_user ON agent_runs(user_id);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
 
 -- Vector indexes (HNSW)
-CREATE INDEX IF NOT EXISTS idx_resume_chunks_embedding
-    ON resume_chunks USING hnsw (embedding vector_cosine_ops);
-
-CREATE INDEX IF NOT EXISTS idx_career_paths_embedding
-    ON career_paths USING hnsw (embedding vector_cosine_ops);
+-- (Add your vector index definitions here when ready, e.g., CREATE INDEX ON resume_chunks USING hnsw (embedding vector_l2_ops))
