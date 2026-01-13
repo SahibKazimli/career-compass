@@ -20,6 +20,7 @@ from backend.db.pg_vectors import (
 from backend.parsing.parsing_helpers import parse_upload
 from backend.utils.llm import summarize_chunks
 from backend.utils.embeddings import init_client
+from backend.agents.recommender import generate_recommendations
 import google.generativeai as genai
 
 
@@ -42,20 +43,24 @@ app.add_middleware(
 )
 
 
-def simple_placeholder_recommendations(
-    skills=None,
-    experience=None,
-    chunk_summaries=None,
-    user_interests=None,
-    current_role=None,
-):
-    """Placeholder until real recommendations are implemented."""
+@app.get("/recommendations/{user_id}")
+def get_recommendations(user_id: int, conn=Depends(get_conn)):
+    resume = fetch_latest_resume(conn, user_id)
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    
+    # Use the REAL recommender agent
+    recommendations = generate_recommendations(
+        conn=conn,
+        user_id=user_id,
+        user_interests=None,  # Could add as query param
+        current_role=None     # Could add as query param
+    )
+    
     return {
-        "message": "Recommendations coming soon",
-        "skills_detected": len(skills) if skills else 0,
-        "experience_sections": len(experience) if experience else 0,
+        "user_id": user_id,
+        "recommendations": recommendations
     }
-
 
 @app. get("/")
 def read_root():
