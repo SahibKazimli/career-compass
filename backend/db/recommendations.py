@@ -2,7 +2,8 @@ import json
 from typing import List, Dict, Any
 from psycopg import Connection
 
-def save_recommendation(conn: Connection, user_id: int, recommendations_data: Dict[str, any]):
+
+def save_recommendation(conn: Connection, user_id: int, recommendations_data: Dict[str, Any]):
     """
     Helper that saves the list of recommended career paths to the database.
     Handles checking/creating the 'career_paths' entries automatically.
@@ -24,8 +25,9 @@ def save_recommendation(conn: Connection, user_id: int, recommendations_data: Di
                 cur.execute(
                     """INSERT INTO career_paths (title, description, avg_salary)
                     VALUES (%s, %s, %s)
+                    RETURNING id
                     """,
-                    (title, rec.get["match_reason"], rec.get("estimated_salary_range"))
+                    (title, rec.get("match_reason"), rec.get("estimated_salary_range"))
                 )
                 path_id = cur.fetchone()["id"]
 
