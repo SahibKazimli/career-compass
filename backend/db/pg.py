@@ -23,7 +23,7 @@ def init_db():
     Safe to run repeatedly (schema uses IF NOT EXISTS).
     Also ensures pgvector is ready.
     """
-    schema_path = Path(__file__).parent / "init" / "schema.sql"
+    schema_path = Path(__file__).parent / "schema.sql"
     if not schema_path.exists():
         raise FileNotFoundError(f"schema.sql not found at {schema_path}")
 

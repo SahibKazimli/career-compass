@@ -18,9 +18,10 @@ def insert_user(conn: Connection, email: str, name: str) -> int:
 def get_user(conn: Connection, user_id: int) -> Optional[Dict]:
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT * FROM users WHERE user_id = %s", (user_id),
+            "SELECT * FROM users WHERE user_id = %s", 
+            (user_id,),
         )
-    row = cur.fetchone()
+        row = cur.fetchone()
     return row
     
     
@@ -29,19 +30,19 @@ def insert_resume(
     user_id: int,
     raw_text: str, 
     parsed_skills_text: str, 
-    parsed_experiences_text: str 
+    parsed_experience_text: str 
     ) -> Optional[Dict]:
     
     with conn.cursor() as cur: 
         cur.execute(
             """
-            INSERT INTO resumes (user_id, raw_text, parsed_skills, parsed_experiences, embedding)
+            INSERT INTO resumes (user_id, raw_text, parsed_skills, parsed_experience, embedding)
             VALUES (%s, %s, %s, %s, %s)
-            RETURNING id
+            RETURNING resume_id
             """,
-            (user_id, raw_text, parsed_skills_text, parsed_experiences_text, None)
+            (user_id, raw_text, parsed_skills_text, parsed_experience_text, None)
         )
-    resume_id = cur.fetchone()["id"]
+        resume_id = cur.fetchone()["resume_id"]
     return resume_id    
     
         
