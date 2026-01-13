@@ -85,7 +85,7 @@ class Orchestrator:
             
             # Save recommendations
             if not isinstance(recommendations, Exception):
-                save_recommendations(conn, user_id, recommendations)
+                save_recommendation(conn, user_id, recommendations)
             else:
                 print(f"[Orchestrator] Recommendations agent failed: {recommendations}")
             

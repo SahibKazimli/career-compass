@@ -1,16 +1,13 @@
 import json
-from contextlib import asynccontextmanager
-from typing import Optional
+import os
 import tempfile
+from contextlib import asynccontextmanager
+from typing import Optional, AsyncGenerator
 
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import BackgroundTasks
+from fastapi. middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from sse_starlette. sse import EventSourceResponse
-
-# Raw Postgres access
 from backend.db.pg import init_db, get_conn
 from backend.db.pg_vectors import (
     insert_user,
@@ -20,12 +17,8 @@ from backend.db.pg_vectors import (
     fetch_resume_chunks,
     search_similar_chunks,
 )
-
-# Parsing
 from backend.parsing.parsing_helpers import parse_upload
 from backend.utils.llm import summarize_chunks
-
-# Embeddings / similarity
 from backend.utils.embeddings import init_client
 import google.generativeai as genai
 
@@ -49,25 +42,34 @@ app.add_middleware(
 )
 
 
+def simple_placeholder_recommendations(
+    skills=None,
+    experience=None,
+    chunk_summaries=None,
+    user_interests=None,
+    current_role=None,
+):
+    """Placeholder until real recommendations are implemented."""
+    return {
+        "message": "Recommendations coming soon",
+        "skills_detected": len(skills) if skills else 0,
+        "experience_sections": len(experience) if experience else 0,
+    }
 
-def simple_placeholder_recommendations():
-    ...
-    # need to implement something with proper recommendations. 
 
-
-@app.get("/")
+@app. get("/")
 def read_root():
     return {"message": "Welcome to the Career Compass API"}
 
 
 @app.post("/users")
-def create_user(email: str, name: str, conn = Depends(get_conn)):
+def create_user(email: str, name: str, conn=Depends(get_conn)):
     user_id = insert_user(conn, email=email, name=name)
     return {"user_id": user_id, "email": email, "name": name}
 
 
 @app.get("/users/{user_id}")
-def get_user_route(user_id: int, conn = Depends(get_conn)):
+def get_user_route(user_id:  int, conn=Depends(get_conn)):
     row = get_user(conn, user_id)
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
@@ -78,15 +80,15 @@ def get_user_route(user_id: int, conn = Depends(get_conn)):
 async def upload_resume(
     user_id: int,
     file: UploadFile = File(...),
-    conn = Depends(get_conn)
+    conn=Depends(get_conn)
 ):
-    if not file.filename.lower().endswith(".pdf"):
+    if not file.filename. lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
 
     if not get_user(conn, user_id):
         raise HTTPException(status_code=404, detail="User not found")
 
-    parsed = parse_upload(file)  # { raw_text, skills, experience, chunks:[{section, content, summary, embedding}] }
+    parsed = parse_upload(file)
 
     resume_id = insert_resume_with_chunks(
         conn=conn,
@@ -110,7 +112,7 @@ async def upload_resume(
                 }
                 for chunk in parsed["chunks"]
             ],
-            "skills": parsed["skills"],
+            "skills":  parsed["skills"],
             "experience": parsed["experience"],
             "total_chunks": len(parsed["chunks"]),
         },
@@ -118,15 +120,15 @@ async def upload_resume(
 
 
 @app.get("/recommendations/{user_id}")
-def get_recommendations(user_id: int, conn = Depends(get_conn)):
+def get_recommendations(user_id: int, conn=Depends(get_conn)):
     resume = fetch_latest_resume(conn, user_id)
-    if not resume:
+    if not resume: 
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    resume_id = resume.get("resume_id")
+    resume_id = resume. get("resume_id")
 
     try:
-        skills = json.loads(resume.get("parsed_skills") or "[]")
+        skills = json.loads(resume. get("parsed_skills") or "[]")
     except Exception:
         skills = []
     try:
@@ -147,8 +149,8 @@ def get_recommendations(user_id: int, conn = Depends(get_conn)):
 
     return {
         "user_id": user_id,
-        "resume_id": resume_id,
-        "skills": skills,
+        "resume_id":  resume_id,
+        "skills":  skills,
         "experience": experience,
         "chunk_sections": [summary for summary, _ in chunk_summaries],
         "recommendations": recommendations,
@@ -157,7 +159,7 @@ def get_recommendations(user_id: int, conn = Depends(get_conn)):
 
 
 @app.get("/resume/analyze/{user_id}")
-def analyze_resume(user_id: int, conn = Depends(get_conn)):
+def analyze_resume(user_id:  int, conn=Depends(get_conn)):
     resume = fetch_latest_resume(conn, user_id)
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found for this user")
@@ -169,7 +171,7 @@ def analyze_resume(user_id: int, conn = Depends(get_conn)):
         "sections": [
             {
                 "section": chunk["section"],
-                "sample": (chunk.get("summary") or chunk.get("content") or "")[:400],
+                "sample": (chunk. get("summary") or chunk.get("content") or "")[:400],
             }
             for chunk in chunks
         ],
@@ -183,11 +185,11 @@ def analyze_resume(user_id: int, conn = Depends(get_conn)):
     }
 
 
-@app.get("/search/chunks")
+@app. get("/search/chunks")
 def search_chunks(
-    query: str = Query(..., description="Natural language query"),
+    query:  str = Query(..., description="Natural language query"),
     user_id: Optional[int] = Query(None),
-    conn = Depends(get_conn),
+    conn=Depends(get_conn),
 ):
     init_client()
     embedding = genai.embed_content(model="models/text-embedding-004", content=query)["embedding"]
@@ -195,38 +197,86 @@ def search_chunks(
     return {"query": query, "results": rows}
 
 
+async def stream_workflow(
+    orchestrator,
+    user_id: int,
+    tmp_path: str,
+    filename: str
+) -> AsyncGenerator[bytes, None]:
+    """
+    Async generator that yields NDJSON (newline-delimited JSON).
+    Each line is a complete JSON object representing a workflow event.
+    """
+    try:
+        async for event in orchestrator.run_resume_workflow_stream(user_id, tmp_path, filename):
+            # Yield each event as a JSON line followed by newline
+            yield json.dumps(event).encode('utf-8') + b'\n'
+    except Exception as e:
+        # Yield error event if something goes wrong
+        error_event = {
+            "type": "error",
+            "data": {"message": str(e), "error_type": type(e).__name__}
+        }
+        yield json.dumps(error_event).encode('utf-8') + b'\n'
+    finally:
+        # Clean up temp file
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 @app.post("/resume/process")
 async def process_resume_full(
     user_id: int,
-    file:  UploadFile = File(...),
-    conn = Depends(get_conn)
+    file: UploadFile = File(... ),
+    stream:  bool = Query(False, description="Enable streaming for real-time progress updates"),
+    conn=Depends(get_conn)
 ):
-    """Process resume through full orchestrator pipeline."""
-    if not file.filename.lower().endswith(".pdf"):
+    """
+    Process resume through full orchestrator pipeline.
+    
+    Args:
+        user_id: The user's ID
+        file: PDF resume file
+        stream:  If True, returns NDJSON stream for real-time progress updates
+        
+    Returns:
+        If stream=False: JSON response with final results
+        If stream=True:  NDJSON stream with progress events
+    """
+    # Validate file type
+    if not file. filename.lower().endswith(". pdf"):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
     
+    # Validate user exists
     if not get_user(conn, user_id):
         raise HTTPException(status_code=404, detail="User not found")
     
     # Save uploaded file temporarily
     file_bytes = await file.read()
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp. name
+    with tempfile.NamedTemporaryFile(delete=False, suffix='. pdf') as tmp:
+        tmp. write(file_bytes)
+        tmp_path = tmp.name
     
-    # Run the orchestrator
+    # Import orchestrator
     from backend.agents.orchestrator import Orchestrator
     orchestrator = Orchestrator()
-    result = await orchestrator.run_resume_workflow(user_id, tmp_path, file.filename)
     
     if stream:
-        # SSE streaming response
-        async def event_generator():
-            async for event in orchestrator.run_resume_workflow_stream(user_id, tmp_path, file. filename):
-                yield {"event": event["type"], "data":  json.dumps(event["data"])}
-        
-        return EventSourceResponse(event_generator())
+        # Return streaming response with NDJSON
+        return StreamingResponse(
+            stream_workflow(orchestrator, user_id, tmp_path, file.filename),
+            media_type="application/x-ndjson",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable nginx buffering if behind nginx
+            }
+        )
     else:
-        # Simple JSON response
-        result = await orchestrator.run_resume_workflow(user_id, tmp_path, file.filename)
-        return result
+        # Non-streaming:  wait for complete result
+        try:
+            result = await orchestrator. run_resume_workflow(user_id, tmp_path, file. filename)
+            return result
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
