@@ -1,9 +1,14 @@
 import json
 from contextlib import asynccontextmanager
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional
+import tempfile
 
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import BackgroundTasks
+from fastapi.responses import StreamingResponse
+
+from sse_starlette. sse import EventSourceResponse
 
 # Raw Postgres access
 from backend.db.pg import init_db, get_conn
@@ -188,3 +193,40 @@ def search_chunks(
     embedding = genai.embed_content(model="models/text-embedding-004", content=query)["embedding"]
     rows = search_similar_chunks(conn, query_embedding=embedding, user_id=user_id, limit=10)
     return {"query": query, "results": rows}
+
+
+@app.post("/resume/process")
+async def process_resume_full(
+    user_id: int,
+    file:  UploadFile = File(...),
+    conn = Depends(get_conn)
+):
+    """Process resume through full orchestrator pipeline."""
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDFs are supported")
+    
+    if not get_user(conn, user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Save uploaded file temporarily
+    file_bytes = await file.read()
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp. name
+    
+    # Run the orchestrator
+    from backend.agents.orchestrator import Orchestrator
+    orchestrator = Orchestrator()
+    result = await orchestrator.run_resume_workflow(user_id, tmp_path, file.filename)
+    
+    if stream:
+        # SSE streaming response
+        async def event_generator():
+            async for event in orchestrator.run_resume_workflow_stream(user_id, tmp_path, file. filename):
+                yield {"event": event["type"], "data":  json.dumps(event["data"])}
+        
+        return EventSourceResponse(event_generator())
+    else:
+        # Simple JSON response
+        result = await orchestrator.run_resume_workflow(user_id, tmp_path, file.filename)
+        return result
