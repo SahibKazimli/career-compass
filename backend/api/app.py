@@ -43,24 +43,6 @@ app.add_middleware(
 )
 
 
-@app.get("/recommendations/{user_id}")
-def get_recommendations(user_id: int, conn=Depends(get_conn)):
-    resume = fetch_latest_resume(conn, user_id)
-    if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found")
-    
-    # Use the REAL recommender agent
-    recommendations = generate_recommendations(
-        conn=conn,
-        user_id=user_id,
-        user_interests=None,  # Could add as query param
-        current_role=None     # Could add as query param
-    )
-    
-    return {
-        "user_id": user_id,
-        "recommendations": recommendations
-    }
 
 @app. get("/")
 def read_root():
@@ -125,41 +107,31 @@ async def upload_resume(
 
 
 @app.get("/recommendations/{user_id}")
-def get_recommendations(user_id: int, conn=Depends(get_conn)):
+def get_recommendations(
+    user_id:  int,
+    user_interests: Optional[str] = Query(None, description="User's career interests"),
+    current_role: Optional[str] = Query(None, description="User's current job role"),
+    conn=Depends(get_conn)
+):
+    """
+    Get AI-generated career recommendations based on user's resume. 
+    """
     resume = fetch_latest_resume(conn, user_id)
-    if not resume: 
-        raise HTTPException(status_code=404, detail="Resume not found")
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found.  Please upload a resume first.")
 
-    resume_id = resume. get("resume_id")
-
-    try:
-        skills = json.loads(resume. get("parsed_skills") or "[]")
-    except Exception:
-        skills = []
-    try:
-        experience = json.loads(resume.get("parsed_experience") or "[]")
-    except Exception:
-        experience = []
-
-    chunks = fetch_resume_chunks(conn, resume_id=resume_id)
-    chunk_summaries = summarize_chunks(chunks)
-
-    recommendations = simple_placeholder_recommendations(
-        skills=skills,
-        experience=experience,
-        chunk_summaries=chunk_summaries,
-        user_interests=None,
-        current_role=None,
+    # Use the recommender agent
+    recommendations = generate_recommendations(
+        conn=conn,
+        user_id=user_id,
+        user_interests=user_interests,
+        current_role=current_role
     )
 
     return {
         "user_id": user_id,
-        "resume_id":  resume_id,
-        "skills":  skills,
-        "experience": experience,
-        "chunk_sections": [summary for summary, _ in chunk_summaries],
-        "recommendations": recommendations,
-        "status": "placeholder",
+        "resume_id": resume. get("resume_id"),
+        "recommendations": recommendations
     }
 
 
@@ -190,7 +162,7 @@ def analyze_resume(user_id:  int, conn=Depends(get_conn)):
     }
 
 
-@app. get("/search/chunks")
+@app.get("/search/chunks")
 def search_chunks(
     query:  str = Query(..., description="Natural language query"),
     user_id: Optional[int] = Query(None),
@@ -210,21 +182,17 @@ async def stream_workflow(
 ) -> AsyncGenerator[bytes, None]:
     """
     Async generator that yields NDJSON (newline-delimited JSON).
-    Each line is a complete JSON object representing a workflow event.
     """
     try:
         async for event in orchestrator.run_resume_workflow_stream(user_id, tmp_path, filename):
-            # Yield each event as a JSON line followed by newline
             yield json.dumps(event).encode('utf-8') + b'\n'
     except Exception as e:
-        # Yield error event if something goes wrong
         error_event = {
             "type": "error",
             "data": {"message": str(e), "error_type": type(e).__name__}
         }
         yield json.dumps(error_event).encode('utf-8') + b'\n'
     finally:
-        # Clean up temp file
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
@@ -238,50 +206,35 @@ async def process_resume_full(
 ):
     """
     Process resume through full orchestrator pipeline.
-    
-    Args:
-        user_id: The user's ID
-        file: PDF resume file
-        stream:  If True, returns NDJSON stream for real-time progress updates
-        
-    Returns:
-        If stream=False: JSON response with final results
-        If stream=True:  NDJSON stream with progress events
     """
-    # Validate file type
-    if not file. filename.lower().endswith(". pdf"):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
-    
-    # Validate user exists
+
     if not get_user(conn, user_id):
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Save uploaded file temporarily
+
     file_bytes = await file.read()
-    with tempfile.NamedTemporaryFile(delete=False, suffix='. pdf') as tmp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
         tmp. write(file_bytes)
         tmp_path = tmp.name
-    
-    # Import orchestrator
+
     from backend.agents.orchestrator import Orchestrator
     orchestrator = Orchestrator()
-    
+
     if stream:
-        # Return streaming response with NDJSON
         return StreamingResponse(
             stream_workflow(orchestrator, user_id, tmp_path, file.filename),
             media_type="application/x-ndjson",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # Disable nginx buffering if behind nginx
+                "X-Accel-Buffering": "no",
             }
         )
     else:
-        # Non-streaming:  wait for complete result
         try:
-            result = await orchestrator. run_resume_workflow(user_id, tmp_path, file. filename)
+            result = await orchestrator. run_resume_workflow(user_id, tmp_path, file.filename)
             return result
-        finally:
+        finally: 
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
