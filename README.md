@@ -11,7 +11,8 @@ Upload your resume and describe your interests, and let the system generate a ta
 This project combines natural language processing, semantic search, and LLM reasoning to deliver actionable career guidance. 
 
 ## Key Features
-- Resume Upload & Parsing using OCR and NLP
+- Resume Upload & Parsing
+- Separated concerns between agents
 - Embedding the users skills and background, compares them with job and career embeddings.
 - Job Recommendation API 
 - Skill Gap Analysis
@@ -21,17 +22,12 @@ This project combines natural language processing, semantic search, and LLM reas
 | Component | Tool |
 |------------|------|
 | **Web Framework** | FastAPI |
-| **Database (ORM)** | SQLite |
-| **vectorDB** | ChromaDB | 
+| **Database** | Postgres + Pgvector |
 | **LLM** | Gemini |
-| **OCR/NLP** | Tesseract |
 | **Security** | python-dotenv |
 | **Server** | uvicorn |
 | **Frontend** | Streamlit (will probably create proper frontend later on) 
 
-Note: A bit unsure if I should use ChromaDB or Postgres with pgvector. MVP with SQLite.
-Note: Will be implementing MVP without vectorDB. 
-Further note: Might be able to skip OCR since Resumes are quite easy to parse? 
 
 ## Program Flow Idea
 
@@ -43,7 +39,7 @@ Further note: Might be able to skip OCR since Resumes are quite easy to parse?
     ├── FastAPI backend parses & embeds text
     │   ├── Extracts skills, experience, education
     │   ├── Generates embeddings (OpenAI/Gemini)
-    │   ├── Stores profile in SQLite + ChromaDB
+    │   ├── Stores profile in Postgresql + Pgvector DB
     │
     ├── User queries “best career paths” or “skills to learn for ML engineer”
     │   ├── FastAPI retrieves embeddings
