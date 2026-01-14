@@ -12,7 +12,7 @@ from backend.db.pg_vectors import insert_resume_with_chunks
 from backend.agents.recommender import generate_recommendations
 from backend.agents.skills_agent import analyze_skills 
 from backend.agents.resume_analyzer import analyze_resume_deep
-from backend.db.recommendations import save_recommendations
+from backend.db.recommendations import save_recommendation
 
 
 class Orchestrator: 
@@ -89,7 +89,7 @@ class Orchestrator:
             
             # Save recommendations
             if not isinstance(recommendations, Exception):
-                save_recommendations(conn, user_id, recommendations)
+                save_recommendation(conn, user_id, recommendations)
             else:
                 print(f"[Orchestrator] Recommendations agent failed: {recommendations}")
             

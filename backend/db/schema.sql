@@ -57,12 +57,31 @@ CREATE TABLE IF NOT EXISTS recommendations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- Skills Analysis (for skills_agent results)
+CREATE TABLE IF NOT EXISTS skills_analysis (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    analysis_data TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Resume Analysis (for resume_analyzer results)
+CREATE TABLE IF NOT EXISTS resume_analysis (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    analysis_data TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 -- Standard indexes
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_resumes_user_id ON resumes(user_id);
 CREATE INDEX IF NOT EXISTS idx_resume_chunks_resume_id ON resume_chunks(resume_id);
 CREATE INDEX IF NOT EXISTS idx_recommendations_user_id ON recommendations(user_id);
 CREATE INDEX IF NOT EXISTS idx_career_paths_title ON career_paths(title);
+CREATE INDEX IF NOT EXISTS idx_skills_analysis_user_id ON skills_analysis(user_id);
+CREATE INDEX IF NOT EXISTS idx_resume_analysis_user_id ON resume_analysis(user_id);
 
 -- Vector indexes (HNSW)
--- (Add your vector index definitions here when ready, e.g., CREATE INDEX ON resume_chunks USING hnsw (embedding vector_l2_ops))

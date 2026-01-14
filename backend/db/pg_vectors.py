@@ -90,7 +90,7 @@ def fetch_latest_resume(conn, user_id: int) -> Optional[dict]:
             """
             SELECT * FROM resumes
             WHERE user_id = %s
-            ORDER BY id DESC
+            ORDER BY resume_id DESC
             LIMIT 1
             """,
             (user_id,),
@@ -139,7 +139,7 @@ def search_similar_chunks(
                 SELECT rc.id, rc.resume_id, rc.section, rc.summary, rc.content,
                        (rc.embedding <-> %s) AS distance
                 FROM resume_chunks rc
-                JOIN resumes r ON r.id = rc.resume_id
+                JOIN resumes r ON r.resume_id = rc.resume_id
                 WHERE r.user_id = %s
                 ORDER BY rc.embedding <-> %s
                 LIMIT %s
