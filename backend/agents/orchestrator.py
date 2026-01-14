@@ -12,7 +12,7 @@ from backend.db.pg_vectors import insert_resume_with_chunks
 from backend.agents.recommender import generate_recommendations
 from backend.agents.skills_agent import analyze_skills 
 from backend.agents.resume_analyzer import analyze_resume_deep
-from backend.db.recommendations import save_recommendation
+from backend.db.recommendations import save_recommendations
 
 
 class Orchestrator: 
@@ -28,8 +28,12 @@ class Orchestrator:
         """Register an agent to run in parallel"""
         self.agents[name] = (func, args, kwargs)
     
-    async def run_all_agents(self):
-        """Execute all registered agents in parallel"""
+    async def run_all_agents(self): 
+        """Execute all registered agents in parallel.
+        This design pattern is more general and flexible, which means that if I
+        need to expand the workflow more, or switch agents, this pattern is way easier to use.
+        For now, I don't really need it, but it's nice to future-proof a bit!
+        """
         tasks = {
             name: asyncio.to_thread(func, *args, **kwargs)
             for name, (func, args, kwargs) in self.agents.items()
@@ -85,7 +89,7 @@ class Orchestrator:
             
             # Save recommendations
             if not isinstance(recommendations, Exception):
-                save_recommendation(conn, user_id, recommendations)
+                save_recommendations(conn, user_id, recommendations)
             else:
                 print(f"[Orchestrator] Recommendations agent failed: {recommendations}")
             

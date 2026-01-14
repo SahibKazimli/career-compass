@@ -98,7 +98,7 @@ def fetch_latest_resume(conn, user_id: int) -> Optional[dict]:
         return cur.fetchone()
 
 
-def fetch_resume_chunks(conn, resume_id: int) -> List[dict]:
+def fetch_resume_chunks(conn: Connection, resume_id: int) -> List[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -113,7 +113,7 @@ def fetch_resume_chunks(conn, resume_id: int) -> List[dict]:
 
 
 def search_similar_chunks(
-    conn,
+    conn: Connection,
     query_embedding: List[float],
     user_id: Optional[int] = None,
     limit: int = 5,
