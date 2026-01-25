@@ -43,7 +43,7 @@ app.add_middleware(
 )
 
 
-@app. get("/")
+@app.get("/")
 def read_root():
     return {"message": "Welcome to the Career Compass API"}
 
@@ -232,7 +232,7 @@ async def process_resume_full(
         )
     else:
         try:
-            result = await orchestrator. run_resume_workflow(user_id, tmp_path, file.filename)
+            result = await orchestrator.run_resume_workflow(user_id, tmp_path, file.filename)
             return result
         finally: 
             if os.path.exists(tmp_path):
