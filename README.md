@@ -2,11 +2,6 @@
 
 **An AI-powered career counseling platform that helps you find your ideal path.**
 
-<div align="center">
-  <img src="media/screenshots/resume_analysis.png" alt="Resume Analysis Dashboard" width="100%" />
-  <br/><br/>
-  <img src="media/screenshots/resume_preview.png" alt="Resume Preview" width="100%" />
-</div>
 
 ## Overview
 
