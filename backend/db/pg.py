@@ -1,12 +1,17 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pgvector.psycopg import register_vector
 
+# Load environment variables from .env file
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(env_path)
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://career_user:career_pass@localhost:5432/career_compass"
+    "postgresql://sahibkazimli@localhost:5432/db"
 )
 
 # Psycopg3 connection pool

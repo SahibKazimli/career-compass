@@ -46,6 +46,15 @@ class Orchestrator:
         conn_gen = get_conn()
         conn = next(conn_gen)
         
+        result = {
+            "message": "Resume processed successfully",
+            "user_id": user_id,
+            "parsed_data": None,
+            "recommendations": None,
+            "skills_analysis": None,
+            "resume_analysis": None,
+        }
+        
         try:
             print(f"[Orchestrator] 1. Parsing Resume...")
             parsed_resume = await asyncio.to_thread(genai_parse_pdf, file_path, original_filename)
@@ -61,7 +70,7 @@ class Orchestrator:
                 if any(x in chunk['section'].lower() for x in ['work', 'experience']):
                     experience.append(chunk['content'])
 
-            insert_resume_with_chunks(
+            resume_id = insert_resume_with_chunks(
                 conn=conn,
                 user_id=user_id,
                 raw_text="Parsed from PDF",
@@ -69,6 +78,13 @@ class Orchestrator:
                 parsed_experience_text=json.dumps(experience),
                 chunks=embedded_resume["chunks"]
             )
+            
+            result["parsed_data"] = {
+                "resume_id": resume_id,
+                "skills": skills,
+                "experience": experience,
+                "total_chunks": len(embedded_resume["chunks"]),
+            }
 
             # 3. PARALLEL AGENT EXECUTION
             print(f"[Orchestrator] 3. Running Agents in Parallel...")
@@ -90,6 +106,7 @@ class Orchestrator:
             # Save recommendations
             if not isinstance(recommendations, Exception):
                 save_recommendation(conn, user_id, recommendations)
+                result["recommendations"] = recommendations
             else:
                 print(f"[Orchestrator] Recommendations agent failed: {recommendations}")
             
@@ -104,6 +121,7 @@ class Orchestrator:
                         (user_id, json.dumps(skills_analysis), datetime.utcnow())
                     )
                 conn.commit()
+                result["skills_analysis"] = skills_analysis
             else:
                 print(f"[Orchestrator] Skills agent failed: {skills_analysis}")
             
@@ -118,14 +136,15 @@ class Orchestrator:
                         (user_id, json.dumps(deep_analysis), datetime.utcnow())
                     )
                 conn.commit()
+                result["resume_analysis"] = deep_analysis
             else:
                 print(f"[Orchestrator] Deep analysis agent failed: {deep_analysis}")
             
             print(f"[Orchestrator] Workflow complete. All agents finished.")
+            return result
 
         except Exception as e:
             print(f"[Orchestrator] Error: {e}")
+            raise e
         finally:
             conn.close()
-            if os.path.exists(file_path):
-                os.remove(file_path)

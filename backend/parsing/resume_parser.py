@@ -12,15 +12,15 @@ for the MVP."""
 
 def init_client():
     find_path = pathlib.Path(__file__).resolve()
-    env_path = find_path.parent.parent / ".env"
+    env_path = find_path.parent.parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
     else:
         load_dotenv() # Fallback 
         
-    api_key = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS not found in environment variables")
+        raise ValueError("GOOGLE_API_KEY not found in environment variables")
     
     genai.configure(api_key=api_key)
 
