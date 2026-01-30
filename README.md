@@ -3,11 +3,12 @@
 **An AI-powered career counseling platform that helps you find your ideal path.**
 
 <div align="center">
-  <!-- Placeholder for future screenshot -->
-  <img src="https://placehold.co/1200x600/10b981/ffffff?text=Career+Compass+Dashboard" alt="Career Compass Dashboard" width="100%" />
+  <img src="media/screenshots/resume_analysis.png" alt="Resume Analysis Dashboard" width="100%" />
+  <br/><br/>
+  <img src="media/screenshots/resume_preview.png" alt="Resume Preview" width="100%" />
 </div>
 
-## 📖 Overview
+## Overview
 
 Career Compass is an intelligent web application designed to analyze your professional background and provide personalized career guidance. By leveraging Large Language Models (LLMs) and vector search, it compares your profile against thousands of potential career paths to suggest the best matches.
 
@@ -16,7 +17,7 @@ Currently, the system focuses on **Resume Analysis** and **Career Matching**, pr
 > **Note from the Developer:**
 > This project is currently in an MVP (Minimum Viable Product) state. I am currently focusing on a startup venture, so features like the detailed **Interactive Roadmap**, **Deep Skills Analysis**, and **Learning Resources** aggregation are currently disabled/not implemented. They are part of the long-term vision to make this a full-fledged career navigation platform.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 This project is built with a modern, high-performance stack separating concerns between a robust backend and a responsive frontend.
 
@@ -33,14 +34,14 @@ This project is built with a modern, high-performance stack separating concerns 
 - **AI/LLM:** Google Gemini API
 - **Vector Embeddings:** For skill and job matching
 
-## ✨ Key Features
+## Key Features
 
 - **Resume Upload & Parsing**: instantly extracts skills, experience, and education from your PDF resume.
 - **AI Analysis**: Uses Gemini to analyze your profile's core competencies and unique value proposition.
 - **Smart Recommendations**: Suggests job titles and career paths based on semantic similarity to your background.
 - **Gap Analysis**: Identifies high-level missing skills for recommended roles.
 
-## 🚀 Getting Started
+## Getting Started
 
 Follow these steps to run the application locally.
 
@@ -88,7 +89,7 @@ npm run dev
 
 The application will be available at `http://localhost:8080`.
 
-## 🔮 Future Roadmap
+## Future Roadmap
 
 As I find time to return to this project, the following features are planned for implementation:
 
@@ -99,4 +100,3 @@ As I find time to return to this project, the following features are planned for
 
 ---
 
-*Built with ❤️ by Sahib Kazimli*
