@@ -5,9 +5,7 @@ import { UserProvider } from './context/UserContext';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Resume from './pages/Resume';
-import Roadmap from './pages/Roadmap';
-import Skills from './pages/Skills';
-import Resources from './pages/Resources';
+
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 
@@ -36,30 +34,7 @@ const App = () => (
                             </DashboardLayout>
                         }
                     />
-                    <Route
-                        path="/roadmap"
-                        element={
-                            <DashboardLayout>
-                                <Roadmap />
-                            </DashboardLayout>
-                        }
-                    />
-                    <Route
-                        path="/skills"
-                        element={
-                            <DashboardLayout>
-                                <Skills />
-                            </DashboardLayout>
-                        }
-                    />
-                    <Route
-                        path="/resources"
-                        element={
-                            <DashboardLayout>
-                                <Resources />
-                            </DashboardLayout>
-                        }
-                    />
+
                     <Route
                         path="/settings"
                         element={

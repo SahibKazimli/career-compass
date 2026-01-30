@@ -3,9 +3,6 @@ import {
     Compass,
     LayoutDashboard,
     FileText,
-    Target,
-    TrendingUp,
-    BookOpen,
     Settings,
     ChevronLeft,
     ChevronRight
@@ -20,9 +17,6 @@ interface SidebarProps {
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: FileText, label: 'Resume', path: '/resume' },
-    { icon: Target, label: 'Roadmap', path: '/roadmap' },
-    { icon: TrendingUp, label: 'Skills', path: '/skills' },
-    { icon: BookOpen, label: 'Resources', path: '/resources' },
 ];
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
