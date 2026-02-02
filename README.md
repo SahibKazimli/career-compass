@@ -7,10 +7,10 @@
 
 Career Compass is an intelligent web application designed to analyze your professional background and provide personalized career guidance. By leveraging Large Language Models (LLMs) and vector search, it compares your profile against thousands of potential career paths to suggest the best matches.
 
-Currently, the system focuses on **Resume Analysis** and **Career Matching**, providing a dashboard that gives you instant feedback on your profile's strength and potential directions.
+Currently, the system focuses on **Resume Analysis**, providing a dashboard that gives you instant feedback on your profile's strength and potential directions.
 
 > **Note from the Developer:**
-> This project is currently in an MVP (Minimum Viable Product) state. I am currently focusing on a startup venture, so features like the detailed **Interactive Roadmap**, **Deep Skills Analysis**, and **Learning Resources** aggregation are currently disabled/not implemented. They are part of the long-term vision to make this a full-fledged career navigation platform.
+> This project is currently in an MVP (Minimum Viable Product) state. I am currently focusing on a startup venture, so features like the detailed **Career Matching**, **Interactive Roadmap**, **Deep Skills Analysis**, and **Learning Resources** aggregation are currently disabled/not implemented. They are part of the long-term vision to make this a full-fledged career navigation platform.
 
 ## Tech Stack
 
@@ -33,8 +33,7 @@ This project is built with a modern, high-performance stack separating concerns 
 
 - **Resume Upload & Parsing**: instantly extracts skills, experience, and education from your PDF resume.
 - **AI Analysis**: Uses Gemini to analyze your profile's core competencies and unique value proposition.
-- **Smart Recommendations**: Suggests job titles and career paths based on semantic similarity to your background.
-- **Gap Analysis**: Identifies high-level missing skills for recommended roles.
+
 
 ## Getting Started
 
