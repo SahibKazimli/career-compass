@@ -35,6 +35,10 @@ class Settings:
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
     
+    @property
+    def RATE_LIMIT(self) -> str:
+        return f"{self.RATE_LIMIT_PER_MINUTE}/minute"
+    
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "5"))
     ALLOWED_FILE_TYPES: List[str] = ["application/pdf"]
