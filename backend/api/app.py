@@ -26,6 +26,8 @@ from backend.parsing.parsing_helpers import parse_upload
 from backend.utils.llm import summarize_chunks
 from backend.utils.embeddings import init_client
 from backend.agents.recommender import generate_recommendations
+from backend.agents.resources_agent import generate_learning_resources, get_resources_for_skill
+from backend.agents.career_matcher import match_careers, get_transition_roadmap
 from backend.api.auth import (
     UserRegister,
     UserLogin,
@@ -643,4 +645,199 @@ def get_roadmap(user_id: int, conn=Depends(get_conn)):
         "skill_gaps": skill_gaps,
         "learning_path": learning_path,
         "created_at": row.get("created_at")
+    }
+
+
+# =============================================================================
+# RESOURCES ENDPOINTS (AI-Generated Learning Resources)
+# =============================================================================
+
+@app.get("/resources/{user_id}")
+@limiter.limit(settings.RATE_LIMIT)
+def get_user_resources(
+    request: Request,
+    user_id: int,
+    time_commitment: str = Query("medium", regex="^(low|medium|high)$"),
+    target_role: Optional[str] = None,
+    conn=Depends(get_conn)
+):
+    """
+    Generate AI-powered learning resources based on user's skill gaps.
+    Uses the skills analysis to determine what resources to recommend.
+    """
+    if not get_user(conn, user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Fetch skills analysis to get skills_to_strengthen
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT analysis_data FROM skills_analysis 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (user_id,)
+        )
+        row = cur.fetchone()
+    
+    if not row or not row.get("analysis_data"):
+        raise HTTPException(
+            status_code=404, 
+            detail="No skills analysis found. Please upload a resume first."
+        )
+    
+    skills_data = json.loads(row["analysis_data"])
+    skills_to_develop = skills_data.get("skills_to_strengthen", [])
+    current_skills = skills_data.get("core_technical_skills", [])
+    
+    # Clean up skill descriptions (remove time estimates from strings)
+    cleaned_skills = []
+    for skill in skills_to_develop[:5]:  # Limit to top 5
+        if isinstance(skill, str):
+            # Strip time estimates like "(Estimated time: ...)"
+            clean = skill.split("(Estimated")[0].strip()
+            clean = clean.split(":")[0].strip() if ":" in clean else clean
+            cleaned_skills.append(clean)
+    
+    # Generate resources using AI agent
+    resources = generate_learning_resources(
+        skills_to_develop=cleaned_skills,
+        current_skills=current_skills[:10],  # Limit context
+        target_role=target_role,
+        time_commitment=time_commitment
+    )
+    
+    return {
+        "user_id": user_id,
+        "skills_analyzed": cleaned_skills,
+        "time_commitment": time_commitment,
+        "target_role": target_role,
+        "resources": resources
+    }
+
+
+@app.get("/resources/skill/{skill_name}")
+@limiter.limit(settings.RATE_LIMIT)
+def get_skill_resources(
+    request: Request,
+    skill_name: str,
+    depth: str = Query("comprehensive", regex="^(quick|comprehensive)$")
+):
+    """
+    Get learning resources for a specific skill.
+    """
+    resources = get_resources_for_skill(skill_name, depth=depth)
+    return resources
+
+
+# =============================================================================
+# CAREER MATCHING ENDPOINTS (AI-Powered Career Recommendations)
+# =============================================================================
+
+@app.get("/careers/{user_id}")
+@limiter.limit(settings.RATE_LIMIT)
+def get_career_matches(
+    request: Request,
+    user_id: int,
+    target_role: Optional[str] = None,
+    conn=Depends(get_conn)
+):
+    """
+    Get AI-generated career path matches based on user profile.
+    """
+    if not get_user(conn, user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Gather user data from various analyses
+    skills_data = {}
+    analysis_data = {}
+    
+    with conn.cursor() as cur:
+        # Get skills analysis
+        cur.execute(
+            "SELECT analysis_data FROM skills_analysis WHERE user_id = %s ORDER BY created_at DESC LIMIT 1",
+            (user_id,)
+        )
+        row = cur.fetchone()
+        if row and row.get("analysis_data"):
+            skills_data = json.loads(row["analysis_data"])
+        
+        # Get resume analysis
+        cur.execute(
+            "SELECT analysis_data FROM resume_analysis WHERE user_id = %s ORDER BY created_at DESC LIMIT 1",
+            (user_id,)
+        )
+        row = cur.fetchone()
+        if row and row.get("analysis_data"):
+            analysis_data = json.loads(row["analysis_data"])
+    
+    if not skills_data and not analysis_data:
+        raise HTTPException(
+            status_code=404,
+            detail="No profile data found. Please upload a resume first."
+        )
+    
+    # Extract relevant info for career matching
+    all_skills = []
+    all_skills.extend(skills_data.get("core_technical_skills", []))
+    all_skills.extend(skills_data.get("soft_skills", []))
+    
+    experience_summary = analysis_data.get("career_progression_pattern", "")
+    interests = skills_data.get("potential_career_directions", [])
+    
+    # Generate career matches
+    matches = match_careers(
+        skills=all_skills[:20],  # Limit context
+        experience_summary=experience_summary[:500] if experience_summary else "",
+        current_role="",  # Could be extracted from resume
+        interests=interests[:5] if interests else []
+    )
+    
+    return {
+        "user_id": user_id,
+        "skills_analyzed": len(all_skills),
+        "career_matches": matches
+    }
+
+
+@app.post("/careers/roadmap")
+@limiter.limit(settings.RATE_LIMIT)
+def create_transition_roadmap(
+    request: Request,
+    current_role: str = Query(..., description="Your current job title"),
+    target_role: str = Query(..., description="Your target career"),
+    timeline: str = Query("6-12 months", description="Desired transition timeline"),
+    user_id: Optional[int] = None,
+    conn=Depends(get_conn)
+):
+    """
+    Generate a detailed career transition roadmap.
+    """
+    current_skills = []
+    
+    # If user_id provided, get their skills
+    if user_id:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT analysis_data FROM skills_analysis WHERE user_id = %s ORDER BY created_at DESC LIMIT 1",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            if row and row.get("analysis_data"):
+                skills_data = json.loads(row["analysis_data"])
+                current_skills = skills_data.get("core_technical_skills", [])
+    
+    # Generate roadmap
+    roadmap = get_transition_roadmap(
+        current_role=current_role,
+        target_role=target_role,
+        current_skills=current_skills[:15],
+        timeline=timeline
+    )
+    
+    return {
+        "current_role": current_role,
+        "target_role": target_role,
+        "timeline": timeline,
+        "roadmap": roadmap
     }
