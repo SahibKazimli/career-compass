@@ -3,12 +3,23 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Token storage keys
+const ACCESS_TOKEN_KEY = 'career_compass_access_token';
+const REFRESH_TOKEN_KEY = 'career_compass_refresh_token';
+
 // Types for API responses
 export interface User {
     user_id: number;
     email: string;
     name: string;
     created_at: string;
+}
+
+export interface AuthTokens {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_in: number;
 }
 
 export interface ResumeUploadResponse {
@@ -80,20 +91,80 @@ export class ApiError extends Error {
     }
 }
 
-// Helper function for API requests
+// =====================
+// Token Management
+// =====================
+
+export function getAccessToken(): string | null {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function setTokens(tokens: AuthTokens): void {
+    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+}
+
+export function clearTokens(): void {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export function isAuthenticated(): boolean {
+    return !!getAccessToken();
+}
+
+// =====================
+// API Request Helper
+// =====================
+
 async function apiRequest<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    requireAuth: boolean = false
 ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
 
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+    };
+
+    // Add authorization header if token exists
+    const token = getAccessToken();
+    if (token) {
+        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    } else if (requireAuth) {
+        throw new ApiError(401, 'Authentication required');
+    }
+
     const response = await fetch(url, {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers,
-        },
+        headers,
     });
+
+    // Handle 401 - try to refresh token
+    if (response.status === 401 && token) {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+            // Retry the request with new token
+            const newToken = getAccessToken();
+            (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
+            const retryResponse = await fetch(url, { ...options, headers });
+
+            if (!retryResponse.ok) {
+                const errorData = await retryResponse.json().catch(() => ({ detail: 'Unknown error' }));
+                throw new ApiError(retryResponse.status, errorData.detail || 'Request failed');
+            }
+            return retryResponse.json();
+        } else {
+            clearTokens();
+            throw new ApiError(401, 'Session expired. Please login again.');
+        }
+    }
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -103,8 +174,90 @@ async function apiRequest<T>(
     return response.json();
 }
 
+async function tryRefreshToken(): Promise<boolean> {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${refreshToken}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.ok) {
+            const tokens: AuthTokens = await response.json();
+            setTokens(tokens);
+            return true;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
 // =====================
-// User API
+// Authentication API
+// =====================
+
+export async function register(email: string, name: string, password: string): Promise<AuthTokens> {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, password }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Registration failed' }));
+        throw new ApiError(response.status, errorData.detail || 'Registration failed');
+    }
+
+    const tokens: AuthTokens = await response.json();
+    setTokens(tokens);
+    return tokens;
+}
+
+export async function login(email: string, password: string): Promise<AuthTokens> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Login failed' }));
+        throw new ApiError(response.status, errorData.detail || 'Invalid email or password');
+    }
+
+    const tokens: AuthTokens = await response.json();
+    setTokens(tokens);
+    return tokens;
+}
+
+export async function logout(): Promise<void> {
+    clearTokens();
+}
+
+export async function getCurrentUser(): Promise<User> {
+    return apiRequest<User>('/auth/me', {}, true);
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await apiRequest('/auth/password', {
+        method: 'PUT',
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }, true);
+}
+
+export async function deleteAccount(): Promise<void> {
+    await apiRequest('/auth/account', { method: 'DELETE' }, true);
+    clearTokens();
+}
+
+// =====================
+// Legacy User API (backward compatibility)
 // =====================
 
 export async function createUser(email: string, name: string): Promise<User> {
@@ -129,9 +282,15 @@ export async function uploadResume(userId: number, file: File): Promise<ResumeUp
     const formData = new FormData();
     formData.append('file', file);
 
-    // Use /resume/process without streaming to get full pipeline (parse + recommendations)
+    const headers: HeadersInit = {};
+    const token = getAccessToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}/resume/process?user_id=${userId}&stream=false`, {
         method: 'POST',
+        headers,
         body: formData,
     });
 
@@ -151,10 +310,17 @@ export async function processResume(
     const formData = new FormData();
     formData.append('file', file);
 
+    const headers: HeadersInit = {};
+    const token = getAccessToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
         `${API_BASE_URL}/resume/process?user_id=${userId}&stream=true`,
         {
             method: 'POST',
+            headers,
             body: formData,
         }
     );
