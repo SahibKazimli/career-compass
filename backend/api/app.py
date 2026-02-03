@@ -4,10 +4,15 @@ import tempfile
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncGenerator
 
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
-from fastapi. middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from backend.config import settings
 from backend.db.pg import init_db, get_conn
 from backend.db.pg_vectors import (
     insert_user,
@@ -21,7 +26,42 @@ from backend.parsing.parsing_helpers import parse_upload
 from backend.utils.llm import summarize_chunks
 from backend.utils.embeddings import init_client
 from backend.agents.recommender import generate_recommendations
+from backend.api.auth import (
+    UserRegister,
+    UserLogin,
+    TokenResponse,
+    UserResponse,
+    PasswordChange,
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_current_user,
+    get_optional_user,
+    get_user_by_email_with_password,
+    create_user_with_password,
+    update_user_password,
+    delete_user_account,
+)
 import google.generativeai as genai
+
+
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not settings.DEBUG:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -34,42 +74,260 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Career Compass", lifespan=lifespan)
 
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
+# =====================
+# Health Check
+# =====================
+
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Career Compass API"}
+    return {"message": "Welcome to the Career Compass API", "version": "1.0.0"}
 
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for deployment monitoring."""
+    return {"status": "healthy"}
+
+
+# =====================
+# Authentication Endpoints
+# =====================
+
+@app.post("/auth/register", response_model=TokenResponse)
+@limiter.limit("5/minute")
+async def register(request: Request, user_data: UserRegister, conn=Depends(get_conn)):
+    """Register a new user account."""
+    # Check if email already exists
+    existing = get_user_by_email_with_password(conn, user_data.email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Validate password strength
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters"
+        )
+    
+    # Create user with hashed password
+    password_hash = hash_password(user_data.password)
+    user_id = create_user_with_password(conn, user_data.email, user_data.name, password_hash)
+    
+    # Generate tokens
+    access_token = create_access_token(user_id, user_data.email)
+    refresh_token = create_refresh_token(user_id)
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.JWT_EXPIRATION_HOURS * 3600
+    )
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def login(request: Request, credentials: UserLogin, conn=Depends(get_conn)):
+    """Login with email and password."""
+    user = get_user_by_email_with_password(conn, credentials.email)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+    
+    # Check if user has a password set
+    if not user.get("password_hash"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please set a password for your account"
+        )
+    
+    if not verify_password(credentials.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+    
+    # Generate tokens
+    access_token = create_access_token(user["user_id"], user["email"])
+    refresh_token = create_refresh_token(user["user_id"])
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.JWT_EXPIRATION_HOURS * 3600
+    )
+
+
+@app.post("/auth/refresh", response_model=TokenResponse)
+@limiter.limit("30/minute")
+async def refresh_token(request: Request, conn=Depends(get_conn)):
+    """Refresh access token using refresh token."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required"
+        )
+    
+    token = auth_header.split(" ")[1]
+    payload = decode_token(token)
+    
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type"
+        )
+    
+    user_id = int(payload.get("sub"))
+    
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, email FROM users WHERE user_id = %s", (user_id,))
+        user = cur.fetchone()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    access_token = create_access_token(user["user_id"], user["email"])
+    new_refresh_token = create_refresh_token(user["user_id"])
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=new_refresh_token,
+        expires_in=settings.JWT_EXPIRATION_HOURS * 3600
+    )
+
+
+@app.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user info."""
+    return UserResponse(
+        user_id=current_user["user_id"],
+        email=current_user["email"],
+        name=current_user["name"],
+        created_at=str(current_user.get("created_at", ""))
+    )
+
+
+@app.put("/auth/password")
+async def change_password(
+    password_data: PasswordChange,
+    current_user: dict = Depends(get_current_user),
+    conn=Depends(get_conn)
+):
+    """Change the current user's password."""
+    # Get user with password
+    user = get_user_by_email_with_password(conn, current_user["email"])
+    
+    # Verify current password if one exists
+    if user.get("password_hash"):
+        if not verify_password(password_data.current_password, user["password_hash"]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect"
+            )
+    
+    # Validate new password
+    if len(password_data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters"
+        )
+    
+    # Update password
+    new_hash = hash_password(password_data.new_password)
+    update_user_password(conn, current_user["user_id"], new_hash)
+    
+    return {"message": "Password updated successfully"}
+
+
+@app.delete("/auth/account")
+async def delete_account(
+    current_user: dict = Depends(get_current_user),
+    conn=Depends(get_conn)
+):
+    """Delete the current user's account."""
+    delete_user_account(conn, current_user["user_id"])
+    return {"message": "Account deleted successfully"}
+
+
+# =====================
+# Legacy User Endpoints (for backward compatibility, will require auth in future)
+# =====================
 
 @app.post("/users")
-def create_user(email: str, name: str, conn=Depends(get_conn)):
+def create_user_legacy(email: str, name: str, conn=Depends(get_conn)):
+    """Create user (legacy endpoint - use /auth/register instead)."""
     user_id = insert_user(conn, email=email, name=name)
     return {"user_id": user_id, "email": email, "name": name}
 
 
 @app.get("/users/{user_id}")
-def get_user_route(user_id:  int, conn=Depends(get_conn)):
+def get_user_route(user_id: int, conn=Depends(get_conn)):
     row = get_user(conn, user_id)
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
     return row
 
 
+@app.get("/users/email/{email}")
+def get_user_by_email(email: str, conn=Depends(get_conn)):
+    """Get user by email address."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, email, name, created_at FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    return row
+
+
+# =====================
+# Resume Endpoints
+# =====================
+
 @app.post("/resume/upload")
+@limiter.limit("10/minute")
 async def upload_resume(
+    request: Request,
     user_id: int,
     file: UploadFile = File(...),
     conn=Depends(get_conn)
 ):
-    if not file.filename. lower().endswith(".pdf"):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDFs are supported")
+
+    # Check file size
+    file_bytes = await file.read()
+    if len(file_bytes) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_SIZE_MB}MB"
+        )
+    await file.seek(0)  # Reset file position
 
     if not get_user(conn, user_id):
         raise HTTPException(status_code=404, detail="User not found")
@@ -98,7 +356,7 @@ async def upload_resume(
                 }
                 for chunk in parsed["chunks"]
             ],
-            "skills":  parsed["skills"],
+            "skills": parsed["skills"],
             "experience": parsed["experience"],
             "total_chunks": len(parsed["chunks"]),
         },
@@ -107,7 +365,7 @@ async def upload_resume(
 
 @app.get("/recommendations/{user_id}")
 def get_recommendations(
-    user_id:  int,
+    user_id: int,
     user_interests: Optional[str] = Query(None, description="User's career interests"),
     current_role: Optional[str] = Query(None, description="User's current job role"),
     regenerate: bool = Query(False, description="Force regeneration of recommendations"),
@@ -119,7 +377,7 @@ def get_recommendations(
     """
     resume = fetch_latest_resume(conn, user_id)
     if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found.  Please upload a resume first.")
+        raise HTTPException(status_code=404, detail="Resume not found. Please upload a resume first.")
 
     # First, try to fetch existing recommendations from database
     if not regenerate:
@@ -175,7 +433,7 @@ def get_recommendations(
 
 
 @app.get("/resume/analyze/{user_id}")
-def analyze_resume(user_id:  int, conn=Depends(get_conn)):
+def analyze_resume(user_id: int, conn=Depends(get_conn)):
     resume = fetch_latest_resume(conn, user_id)
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found for this user")
@@ -187,7 +445,7 @@ def analyze_resume(user_id:  int, conn=Depends(get_conn)):
         "sections": [
             {
                 "section": chunk["section"],
-                "sample": (chunk. get("summary") or chunk.get("content") or "")[:400],
+                "sample": (chunk.get("summary") or chunk.get("content") or "")[:400],
             }
             for chunk in chunks
         ],
@@ -203,7 +461,7 @@ def analyze_resume(user_id:  int, conn=Depends(get_conn)):
 
 @app.get("/search/chunks")
 def search_chunks(
-    query:  str = Query(..., description="Natural language query"),
+    query: str = Query(..., description="Natural language query"),
     user_id: Optional[int] = Query(None),
     conn=Depends(get_conn),
 ):
@@ -237,10 +495,12 @@ async def stream_workflow(
 
 
 @app.post("/resume/process")
+@limiter.limit("5/minute")
 async def process_resume_full(
+    request: Request,
     user_id: int,
-    file: UploadFile = File(... ),
-    stream:  bool = Query(False, description="Enable streaming for real-time progress updates"),
+    file: UploadFile = File(...),
+    stream: bool = Query(False, description="Enable streaming for real-time progress updates"),
     conn=Depends(get_conn)
 ):
     """
@@ -253,8 +513,16 @@ async def process_resume_full(
         raise HTTPException(status_code=404, detail="User not found")
 
     file_bytes = await file.read()
+    
+    # Check file size
+    if len(file_bytes) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_SIZE_MB}MB"
+        )
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-        tmp. write(file_bytes)
+        tmp.write(file_bytes)
         tmp_path = tmp.name
 
     from backend.agents.orchestrator import Orchestrator
@@ -274,20 +542,9 @@ async def process_resume_full(
         try:
             result = await orchestrator.run_resume_workflow(user_id, tmp_path, file.filename)
             return result
-        finally: 
+        finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-
-
-@app.get("/users/email/{email}")
-def get_user_by_email(email: str, conn=Depends(get_conn)):
-    """Get user by email address."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT user_id, email, name, created_at FROM users WHERE email = %s", (email,))
-        row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="User not found")
-    return row
 
 
 @app.get("/skills/{user_id}")
