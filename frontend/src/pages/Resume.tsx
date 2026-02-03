@@ -93,8 +93,8 @@ export default function Resume() {
         }
 
         // Career pattern
-        const careerPattern = analysis.career_pattern || analysis.careerProgressionPattern ||
-            analysis.career_trajectory || analysis.experience_summary;
+        const careerPattern = analysis.career_progression_pattern || analysis.career_pattern ||
+            analysis.careerProgressionPattern || analysis.career_trajectory || analysis.experience_summary;
         if (careerPattern) {
             highlights.push({
                 label: 'Career Pattern',
@@ -103,8 +103,8 @@ export default function Resume() {
         }
 
         // Unique value proposition
-        const uniqueValue = analysis.unique_value || analysis.uniqueValueProposition ||
-            analysis.unique_strengths || analysis.standout_qualities;
+        const uniqueValue = analysis.unique_value_proposition || analysis.unique_value ||
+            analysis.uniqueValueProposition || analysis.unique_strengths || analysis.standout_qualities;
         if (uniqueValue) {
             highlights.push({
                 label: 'Unique Value',
@@ -151,21 +151,29 @@ export default function Resume() {
         const analysis = analysisData.analysis as Record<string, unknown>;
         const improvements: string[] = [];
 
-        if (analysis.actionable_improvements || analysis.actionableImprovements) {
-            const items = analysis.actionable_improvements || analysis.actionableImprovements;
+        // Check for actionable resume improvements (primary source)
+        if (analysis.actionable_resume_improvements || analysis.actionable_improvements ||
+            analysis.actionableImprovements || analysis.actionableResumeImprovements) {
+            const items = analysis.actionable_resume_improvements || analysis.actionable_improvements ||
+                analysis.actionableImprovements || analysis.actionableResumeImprovements;
             if (Array.isArray(items)) {
-                improvements.push(...items.map(String));
+                // Clean up markdown formatting from the items
+                improvements.push(...items.map(item => {
+                    const str = String(item);
+                    // Remove markdown bold markers
+                    return str.replace(/\*\*/g, '').replace(/^[\s-•]*/, '').trim();
+                }));
             }
         }
 
         if (analysis.areas_for_development || analysis.areasForDevelopment) {
             const items = analysis.areas_for_development || analysis.areasForDevelopment;
-            if (Array.isArray(items)) {
+            if (Array.isArray(items) && improvements.length === 0) {
                 improvements.push(...items.map(String));
             }
         }
 
-        if (analysis.suggestions) {
+        if (analysis.suggestions && improvements.length === 0) {
             const items = analysis.suggestions;
             if (Array.isArray(items)) {
                 improvements.push(...items.map(String));

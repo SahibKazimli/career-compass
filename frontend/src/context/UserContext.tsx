@@ -1,65 +1,66 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { User, getUserByEmail, createUser, getUserById } from '../services/api';
+import {
+    User,
+    getCurrentUser,
+    login as apiLogin,
+    register as apiRegister,
+    logout as apiLogout,
+    isAuthenticated as checkAuth,
+    clearTokens,
+    getAccessToken
+} from '../services/api';
 
 interface UserContextType {
     user: User | null;
     isLoading: boolean;
+    isAuthenticated: boolean;
     error: string | null;
     hasResume: boolean;
     setHasResume: (value: boolean) => void;
-    login: (email: string, name: string) => Promise<void>;
-    loginWithId: (userId: number) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
+    register: (email: string, name: string, password: string) => Promise<void>;
     logout: () => void;
     clearError: () => void;
+    refreshUser: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
-
-const USER_STORAGE_KEY = 'career_compass_user';
 
 export function UserProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [hasResume, setHasResume] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    // Load user from localStorage on mount
+    // Load user on mount if token exists
     useEffect(() => {
-        const savedUser = localStorage.getItem(USER_STORAGE_KEY);
-        if (savedUser) {
-            try {
-                const parsed = JSON.parse(savedUser);
-                setUser(parsed);
-            } catch (e) {
-                localStorage.removeItem(USER_STORAGE_KEY);
+        const initAuth = async () => {
+            if (checkAuth()) {
+                try {
+                    const userData = await getCurrentUser();
+                    setUser(userData);
+                    setIsAuthenticated(true);
+                } catch (e) {
+                    // Token invalid/expired, clear it
+                    clearTokens();
+                    setIsAuthenticated(false);
+                }
             }
-        }
-        setIsLoading(false);
+            setIsLoading(false);
+        };
+        initAuth();
     }, []);
 
-    // Save user to localStorage when it changes
-    useEffect(() => {
-        if (user) {
-            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-        } else {
-            localStorage.removeItem(USER_STORAGE_KEY);
-        }
-    }, [user]);
-
-    const login = useCallback(async (email: string, name: string) => {
+    const login = useCallback(async (email: string, password: string) => {
         setIsLoading(true);
         setError(null);
 
         try {
-            // Try to get existing user
-            let userData: User;
-            try {
-                userData = await getUserByEmail(email);
-            } catch (e) {
-                // User doesn't exist, create new one
-                userData = await createUser(email, name);
-            }
+            await apiLogin(email, password);
+            const userData = await getCurrentUser();
             setUser(userData);
+            setIsAuthenticated(true);
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'Failed to login';
             setError(errorMessage);
@@ -69,15 +70,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const loginWithId = useCallback(async (userId: number) => {
+    const register = useCallback(async (email: string, name: string, password: string) => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const userData = await getUserById(userId);
+            await apiRegister(email, name, password);
+            const userData = await getCurrentUser();
             setUser(userData);
+            setIsAuthenticated(true);
         } catch (e) {
-            const errorMessage = e instanceof Error ? e.message : 'Failed to login';
+            const errorMessage = e instanceof Error ? e.message : 'Failed to register';
             setError(errorMessage);
             throw e;
         } finally {
@@ -86,10 +89,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const logout = useCallback(() => {
+        apiLogout();
         setUser(null);
         setHasResume(false);
-        localStorage.removeItem(USER_STORAGE_KEY);
+        setIsAuthenticated(false);
     }, []);
+
+    const refreshUser = useCallback(async () => {
+        if (getAccessToken()) {
+            try {
+                const userData = await getCurrentUser();
+                setUser(userData);
+                setIsAuthenticated(true);
+            } catch {
+                logout();
+            }
+        }
+    }, [logout]);
 
     const clearError = useCallback(() => {
         setError(null);
@@ -100,13 +116,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
             value={{
                 user,
                 isLoading,
+                isAuthenticated,
                 error,
                 hasResume,
                 setHasResume,
                 login,
-                loginWithId,
+                register,
                 logout,
                 clearError,
+                refreshUser,
             }}
         >
             {children}
