@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     user_id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
+    password_hash TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
