@@ -58,10 +58,18 @@ export interface RecommendationsResponse {
     };
 }
 
+export interface SkillsData {
+    core_technical_skills?: string[];
+    soft_skills?: string[];
+    standout_skills?: string[];
+    skills_to_strengthen?: string[];
+    potential_career_directions?: string[];
+}
+
 export interface SkillsAnalysisResponse {
     user_id: number;
     analysis_id?: number;
-    skills: Record<string, unknown>;
+    skills: SkillsData;
     created_at?: string;
     message?: string;
 }

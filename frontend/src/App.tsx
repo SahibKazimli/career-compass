@@ -6,6 +6,9 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Resume from './pages/Resume';
+import Skills from './pages/Skills';
+import Resources from './pages/Resources';
+import Careers from './pages/Careers';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -41,6 +44,36 @@ const App = () => (
                             <ProtectedRoute>
                                 <DashboardLayout>
                                     <Resume />
+                                </DashboardLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/skills"
+                        element={
+                            <ProtectedRoute>
+                                <DashboardLayout>
+                                    <Skills />
+                                </DashboardLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/resources"
+                        element={
+                            <ProtectedRoute>
+                                <DashboardLayout>
+                                    <Resources />
+                                </DashboardLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/careers"
+                        element={
+                            <ProtectedRoute>
+                                <DashboardLayout>
+                                    <Careers />
                                 </DashboardLayout>
                             </ProtectedRoute>
                         }

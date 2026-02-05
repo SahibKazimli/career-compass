@@ -5,7 +5,7 @@ import { useResumeAnalysis, useSkillsAnalysis, useAnalyzeResume } from '../hooks
 import { useUser } from '../context/UserContext';
 
 export default function Resume() {
-    const { user, hasResume } = useUser();
+    const { hasResume } = useUser();
     const { data: analysisData, isLoading: analysisLoading } = useResumeAnalysis();
     const { data: skillsData, isLoading: skillsLoading } = useSkillsAnalysis();
     const { data: resumeAnalyze, isLoading: resumeLoading } = useAnalyzeResume();
@@ -33,7 +33,7 @@ export default function Resume() {
 
             // If object has arrays of skills, flatten them
             const allValues: string[] = [];
-            for (const [key, val] of Object.entries(obj)) {
+            for (const [, val] of Object.entries(obj)) {
                 if (Array.isArray(val)) {
                     // Extract items from arrays
                     for (const item of val.slice(0, 4)) {
