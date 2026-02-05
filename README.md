@@ -117,10 +117,12 @@ The application will be available at `http://localhost:8080`.
 
 ### AI Agents
 
-- **Resume Parser**: Extracts structured data from PDFs
-- **Skills Analyzer**: Evaluates skillset and identifies gaps
-- **Career Recommender**: Matches profiles to career paths using embeddings
-- **Roadmap Generator**: Creates step-by-step career transition plans
+- **Resume Analyzer** (`resume_analyzer.py`): Performs deep analysis of resume sections to extract core competencies, career progression patterns, and unique value propositions
+- **Skills Agent** (`skills_agent.py`): Analyzes user's skillset, identifies gaps, and suggests learning paths for target roles
+- **Recommender** (`recommender.py`): Generates AI-powered career recommendations based on resume data using vector embeddings
+- **Career Matcher** (`career_matcher.py`): Matches user profiles to suitable career paths and creates detailed transition roadmaps with difficulty assessments
+- **Resources Agent (Not Used) ** (`resources_agent.py`): Generates personalized learning resources (courses, books, projects) based on skill gaps
+- **Orchestrator** (`orchestrator.py`): Manages the workflow pipeline and coordinates agent execution in parallel
 
 ### Database Architecture
 
@@ -168,13 +170,6 @@ GOOGLE_API_KEY=your_gemini_api_key
 JWT_SECRET=your_secret_key
 ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173
 ```
-
-## Future Enhancements
-
-- **Learning Resources**: Automated resource aggregation for skill gaps
-- **Interactive Roadmap**: Track progress through career transitions
-- **Skills Graph**: Visual knowledge graph of skill relationships
-- **Job Market Integration**: Real-time job posting analysis
 
 ---
 
