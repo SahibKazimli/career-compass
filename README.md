@@ -34,6 +34,20 @@ This project is built with a modern, high-performance stack separating concerns 
 - **Resume Upload & Parsing**: instantly extracts skills, experience, and education from your PDF resume.
 - **AI Analysis**: Uses Gemini to analyze your profile's core competencies and unique value proposition.
 
+### Screenshots
+
+*Dashboard - Welcome State (before resume upload)*  
+![Dashboard Welcome](/media/screenshots/Screenshot%202026-02-05%20at%2018.25.16.png)
+
+*Resume Upload Page*  
+![Resume Upload](/media/screenshots/Screenshot%202026-02-05%20at%2018.27.08.png)
+
+*Skills Analysis Page*  
+![Skills Analysis](/media/screenshots/Screenshot%202026-02-05%20at%2018.27.19.png)
+
+*Career Matching Page*  
+![Career Matching](/media/screenshots/Screenshot%202026-02-05%20at%2018.27.29.png)
+
 
 ## Getting Started
 
