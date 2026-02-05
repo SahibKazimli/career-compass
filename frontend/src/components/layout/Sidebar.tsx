@@ -7,7 +7,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Zap,
-    BookOpen,
+
     Briefcase
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
@@ -21,7 +21,7 @@ const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: FileText, label: 'Resume', path: '/resume' },
     { icon: Zap, label: 'Skills', path: '/skills' },
-    { icon: BookOpen, label: 'Resources', path: '/resources' },
+
     { icon: Briefcase, label: 'Careers', path: '/careers' },
 ];
 

@@ -1,4 +1,4 @@
-import { Target, TrendingUp, BookOpen, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { Target, TrendingUp, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { StatCard } from '../components/dashboard/StatCard';
 import { RecommendationCard } from '../components/dashboard/RecommendationCard';
 import { SkillsOverview } from '../components/dashboard/SkillsOverview';
@@ -125,32 +125,7 @@ export default function Dashboard() {
                 </Card>
 
                 {/* Show mock data preview */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard
-                        title="Career Matches"
-                        value="—"
-                        subtitle="Upload resume to see"
-                        icon={Target}
-                    />
-                    <StatCard
-                        title="Skills Analyzed"
-                        value="—"
-                        subtitle="Upload resume to see"
-                        icon={TrendingUp}
-                    />
-                    <StatCard
-                        title="Learning Resources"
-                        value="—"
-                        subtitle="Upload resume to see"
-                        icon={BookOpen}
-                    />
-                    <StatCard
-                        title="Est. Transition"
-                        value="—"
-                        subtitle="Upload resume to see"
-                        icon={Clock}
-                    />
-                </div>
+
             </div>
         );
     }
@@ -221,34 +196,7 @@ export default function Dashboard() {
                 </p>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                    title="Career Matches"
-                    value={recommendations.length}
-                    subtitle="Based on your profile"
-                    icon={Target}
-                />
-                <StatCard
-                    title="Skills Analyzed"
-                    value={skills.length}
-                    subtitle={`${skills.filter(s => s.level === 'advanced' || s.level === 'expert').length} advanced`}
-                    icon={TrendingUp}
-                    trend={{ value: 12, positive: true }}
-                />
-                <StatCard
-                    title="Learning Resources"
-                    value={24}
-                    subtitle="Personalized for you"
-                    icon={BookOpen}
-                />
-                <StatCard
-                    title="Est. Transition"
-                    value={recommendations[0]?.timeToTransition || "6-12 mo"}
-                    subtitle="To target role"
-                    icon={Clock}
-                />
-            </div>
+
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

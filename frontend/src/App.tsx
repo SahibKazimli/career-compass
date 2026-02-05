@@ -7,7 +7,7 @@ import { DashboardLayout } from './components/layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Resume from './pages/Resume';
 import Skills from './pages/Skills';
-import Resources from './pages/Resources';
+
 import Careers from './pages/Careers';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -54,16 +54,6 @@ const App = () => (
                             <ProtectedRoute>
                                 <DashboardLayout>
                                     <Skills />
-                                </DashboardLayout>
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/resources"
-                        element={
-                            <ProtectedRoute>
-                                <DashboardLayout>
-                                    <Resources />
                                 </DashboardLayout>
                             </ProtectedRoute>
                         }

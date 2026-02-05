@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { useUser } from '../context/UserContext';
+import { getAccessToken } from '../services/api';
 import {
     Briefcase,
     Loader2,
@@ -62,7 +63,7 @@ export default function Careers() {
         setError(null);
 
         try {
-            const token = localStorage.getItem('access_token');
+            const token = getAccessToken();
             const response = await fetch(
                 `${API_BASE}/careers/${user.user_id}`,
                 {
