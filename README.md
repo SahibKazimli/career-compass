@@ -171,5 +171,8 @@ JWT_SECRET=your_secret_key
 ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173
 ```
 
+Note from Developer: Honestly JWT is super unnecessary, but I used it since I originally wanted to host this project safely. But since I'm focusing 
+on building a startup, this isn't quite as high on the priority list as that. 
+
 ---
 
